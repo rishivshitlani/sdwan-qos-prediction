@@ -27,7 +27,8 @@ sdwan-qos-prediction/
 │   │       └── MachineLearningCVE/
 │   ├── processed/
 │   │   └── cleaned/
-│   └── sdwan_qos_synthetic.csv
+│   └── synthetic/
+│       └── sdwan_qos_synthetic.csv
 |
 ├── src/
 │   ├── generate_dataset.py
@@ -104,7 +105,7 @@ The supervised regression target is:
 This creates:
 
 ```text
-data/sdwan_qos_synthetic.csv
+data/synthetic/sdwan_qos_synthetic.csv
 ```
 
 The synthetic dataset contains SD-WAN-style features and a rule-based `recommended_bandwidth_percent` target.

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 # Keep the synthetic dataset reproducible across runs.
 np.random.seed(42)
@@ -65,8 +66,11 @@ def calculate_bandwidth(row):
 # This is the supervised regression target for the synthetic dataset.
 data["recommended_bandwidth_percent"] = data.apply(calculate_bandwidth, axis=1)
 
-# Save the generated data. The CSV is ignored by Git because it is generated.
-data.to_csv("data/synthetic/sdwan_qos_synthetic.csv", index=False)
+output_path = Path("data/synthetic/sdwan_qos_synthetic.csv")
+output_path.parent.mkdir(parents=True, exist_ok=True)
 
-print("Dataset created: data/sdwan_qos_synthetic.csv")
+# Save the generated data. The CSV is ignored by Git because it is generated.
+data.to_csv(output_path, index=False)
+
+print(f"Dataset created: {output_path}")
 print(data.head())
