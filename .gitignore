@@ -4,4 +4,10 @@ __pycache__/
 .venv/
 models/*.pkl
 data/*.csv
+data/MachineLearningCVE/
+data/TrafficLabelling*/
+data/raw/
+data/interim/
+data/processed/
+data/synthetic/
 .DS_Store

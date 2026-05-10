@@ -1,14 +1,19 @@
 import pandas as pd
 import numpy as np
 
+# Keep the synthetic dataset reproducible across runs.
 np.random.seed(42)
 
-n = 5000
+# Number of synthetic network flow records to generate.
+n = 50000
 
+# Categorical values used to mimic SD-WAN traffic and link context.
 application_types = ["voice", "video", "web", "file_transfer", "database"]
 protocols = ["TCP", "UDP"]
 link_types = ["MPLS", "Broadband", "LTE"]
 
+# Generate a synthetic SD-WAN-like flow table. The numeric ranges are broad
+# approximations of network conditions rather than measurements from real links.
 data = pd.DataFrame({
     "latency_ms": np.random.uniform(5, 250, n),
     "jitter_ms": np.random.uniform(0, 80, n),
@@ -25,8 +30,10 @@ data = pd.DataFrame({
 
 
 def calculate_bandwidth(row):
+    """Create a rule-based QoS bandwidth recommendation for one flow."""
     base = 30
 
+    # Give latency-sensitive or business-critical applications more bandwidth.
     if row["application_type"] == "voice":
         base += 30
     elif row["application_type"] == "video":
@@ -38,6 +45,7 @@ def calculate_bandwidth(row):
     else:
         base += 5
 
+    # Increase the recommendation when network conditions look degraded.
     if row["latency_ms"] > 100:
         base += 10
 
@@ -50,11 +58,15 @@ def calculate_bandwidth(row):
     if row["bandwidth_utilization_percent"] > 80:
         base += 5
 
+    # Cap the recommendation because the target is a percentage.
     return min(base, 100)
 
+
+# This is the supervised regression target for the synthetic dataset.
 data["recommended_bandwidth_percent"] = data.apply(calculate_bandwidth, axis=1)
 
-data.to_csv("data/sdwan_qos_synthetic.csv", index=False)
+# Save the generated data. The CSV is ignored by Git because it is generated.
+data.to_csv("data/synthetic/sdwan_qos_synthetic.csv", index=False)
 
 print("Dataset created: data/sdwan_qos_synthetic.csv")
 print(data.head())

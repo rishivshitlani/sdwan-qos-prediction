@@ -6,3 +6,5 @@ seaborn
 xgboost
 jupyter
 joblib
+scapy
+openpyxl
