@@ -10,4 +10,8 @@ data/raw/
 data/interim/
 data/processed/
 data/synthetic/
+flamboyant-heyrovsky-64ad14/
+reports/
+documents/
 .DS_Store
+WORKLOG.ipynb
