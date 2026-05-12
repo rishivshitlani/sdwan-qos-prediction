@@ -35,6 +35,14 @@ from process_public_dataset import (
 
 
 DEFAULT_CLEANED_DIR = DEFAULT_OUTPUT_DIR / "cleaned"
+MISSING_POLICY_CHOICES = ("all", "label", "required", "none")
+
+
+def parse_required_columns(required_columns: str | None) -> list[str]:
+    """Split a comma-separated column list from the command line."""
+    if not required_columns:
+        return []
+    return [column.strip() for column in required_columns.split(",") if column.strip()]
 
 
 def update_column_profile(
@@ -169,7 +177,8 @@ def clean_dataset(
     chunksize: int,
     requested_label_column: str | None,
     imbalance_threshold: float,
-    drop_missing_rows: bool,
+    missing_policy: str,
+    required_columns: list[str],
 ) -> tuple[dict[str, object], pd.DataFrame, pd.DataFrame]:
     """Profile one dataset, remove constant-zero columns, and save cleaned CSV."""
     print(f"\nDataset: {dataset_name}")
@@ -195,6 +204,9 @@ def clean_dataset(
     # Remove only columns proven to be numeric and always zero. Other columns,
     # including the label column, are preserved for downstream modelling.
     output_columns = [column for column in column_order if column not in constant_zero_columns]
+    missing_required_columns = [column for column in required_columns if column not in output_columns]
+    if missing_policy == "required" and missing_required_columns:
+        print(f"Required columns not found in {dataset_name}: {', '.join(missing_required_columns)}")
 
     rows_written = 0
     rows_dropped_missing = 0
@@ -213,8 +225,20 @@ def clean_dataset(
             chunk = chunk.reindex(columns=output_columns)
 
             before_drop = len(chunk)
-            if drop_missing_rows:
+            if missing_policy == "all":
+                # Strict mode: remove a row if any remaining column is missing.
+                # This is useful for clean benchmark files such as CICIDS2017.
                 chunk = chunk.dropna()
+            elif missing_policy == "label" and label_column and label_column in chunk.columns:
+                # Supervised models need a target label, but optional feature
+                # fields can remain missing for later imputation or modelling.
+                chunk = chunk.dropna(subset=[label_column])
+            elif missing_policy == "required":
+                # Reusable mode for future datasets: only drop rows missing
+                # columns the user marks as necessary for their experiment.
+                available_required_columns = [column for column in required_columns if column in chunk.columns]
+                if available_required_columns:
+                    chunk = chunk.dropna(subset=available_required_columns)
             rows_dropped_missing += before_drop - len(chunk)
 
             # The imbalance report should describe the rows that remain after
@@ -234,6 +258,9 @@ def clean_dataset(
         "raw_rows": profile["rows_seen"],
         "cleaned_rows": rows_written,
         "rows_dropped_missing_or_infinite": rows_dropped_missing,
+        "missing_policy": missing_policy,
+        "required_columns": ", ".join(required_columns),
+        "missing_required_columns": ", ".join(missing_required_columns),
         "raw_feature_count": len(column_order),
         "cleaned_feature_count": len(output_columns),
         "constant_zero_features_removed": len(constant_zero_columns),
@@ -293,7 +320,8 @@ def clean_datasets(
     output_prefix: str,
     exclude_patterns: list[str],
     imbalance_threshold: float,
-    drop_missing_rows: bool,
+    missing_policy: str,
+    required_columns: list[str],
 ) -> None:
     """Clean all detected datasets and write cleaned data plus reports."""
     dataset_files = find_dataset_files(input_path, exclude_patterns)
@@ -320,7 +348,8 @@ def clean_datasets(
             chunksize=chunksize,
             requested_label_column=label_column,
             imbalance_threshold=imbalance_threshold,
-            drop_missing_rows=drop_missing_rows,
+            missing_policy=missing_policy,
+            required_columns=required_columns,
         )
         summaries.append(summary)
         removed_feature_reports.append(removed_features_df)
@@ -371,13 +400,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--keep-missing-rows",
         action="store_true",
-        help="Keep rows with missing or infinite-derived values instead of dropping them.",
+        help="Deprecated shortcut for --missing-policy none.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--missing-policy",
+        choices=MISSING_POLICY_CHOICES,
+        default="all",
+        help=(
+            "Choose which rows to drop after infinite values are converted to missing values: "
+            "'all' drops rows missing any column, 'label' drops only missing-label rows, "
+            "'required' drops rows missing user-specified required columns, and 'none' keeps them."
+        ),
+    )
+    parser.add_argument(
+        "--required-columns",
+        default=None,
+        help="Comma-separated columns used when --missing-policy required is selected.",
+    )
+    args = parser.parse_args()
+    if args.missing_policy == "required" and not parse_required_columns(args.required_columns):
+        parser.error("--missing-policy required needs --required-columns")
+    return args
 
 
 if __name__ == "__main__":
     args = parse_args()
+    missing_policy = "none" if args.keep_missing_rows else args.missing_policy
     clean_datasets(
         input_path=args.input_path,
         output_dir=args.output_dir,
@@ -386,5 +434,6 @@ if __name__ == "__main__":
         output_prefix=args.output_prefix,
         exclude_patterns=args.exclude,
         imbalance_threshold=args.imbalance_threshold,
-        drop_missing_rows=not args.keep_missing_rows,
+        missing_policy=missing_policy,
+        required_columns=parse_required_columns(args.required_columns),
     )

@@ -48,8 +48,9 @@ def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def clean_label_values(labels: pd.Series) -> pd.Series:
-    """Normalize label values so equivalent labels count together."""
-    return labels.astype(str).str.strip().str.replace("\ufffd", "-", regex=False)
+    """Normalize real label values while leaving missing labels out of counts."""
+    cleaned = labels.dropna().astype(str).str.strip().str.replace("\ufffd", "-", regex=False)
+    return cleaned[cleaned != ""]
 
 
 def find_dataset_files(input_path: Path, exclude_patterns: list[str]) -> list[Path]:
