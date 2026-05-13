@@ -66,8 +66,13 @@ def split_features_and_target(
     drop_columns: list[str],
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Separate model inputs from the regression target."""
+    # Only drop columns that are present so the same trainer can be reused with
+    # synthetic, CICIDS-derived, and Zenodo datasets.
     columns_to_drop = [column for column in drop_columns if column in data.columns]
     features = data.drop(columns=[target_column, *columns_to_drop])
+
+    # Regression metrics require a numeric target. Non-numeric or missing target
+    # values are converted to NaN and removed below.
     target = pd.to_numeric(data[target_column], errors="coerce")
 
     valid_target_mask = target.notna()
@@ -76,6 +81,8 @@ def split_features_and_target(
 
 def build_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
     """Build preprocessing for numeric and categorical project features."""
+    # Numeric columns can be scaled directly; object/string columns need one-hot
+    # encoding so Linear Regression can use them.
     numeric_columns = features.select_dtypes(include=[np.number]).columns.tolist()
     categorical_columns = [column for column in features.columns if column not in numeric_columns]
 
@@ -97,6 +104,8 @@ def build_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
             ("numeric", numeric_pipeline, numeric_columns),
             ("categorical", categorical_pipeline, categorical_columns),
         ],
+        # Drop anything not explicitly routed through the numeric or categorical
+        # pipelines. This keeps the feature matrix predictable.
         remainder="drop",
     )
 
@@ -113,6 +122,8 @@ def evaluate_model(
     target_column: str,
 ) -> dict[str, object]:
     """Train one model and return regression metrics for the selected target."""
+    # The pipeline ensures preprocessing learned on the training split is reused
+    # consistently on the test split.
     pipeline = Pipeline(
         steps=[
             ("preprocess", preprocessor),
@@ -128,6 +139,8 @@ def evaluate_model(
     predictions = pipeline.predict(x_test)
     inference_time_sec = perf_counter() - inference_start
 
+    # MAE/RMSE show error in target units. R2 shows how much variance the model
+    # explains compared with predicting the mean.
     mae = mean_absolute_error(y_test, predictions)
     rmse = float(np.sqrt(mean_squared_error(y_test, predictions)))
     r2 = r2_score(y_test, predictions)
@@ -162,6 +175,7 @@ def train_baselines(
     data = load_dataset(input_path, target_column)
     features, target = split_features_and_target(data, target_column, drop_columns)
 
+    # Use a fixed random_state so baseline results are repeatable in reports.
     x_train, x_test, y_train, y_test = train_test_split(
         features,
         target,
@@ -171,6 +185,8 @@ def train_baselines(
 
     preprocessor = build_preprocessor(features)
     models = [
+        # DummyRegressor is the sanity-check baseline: real models should beat
+        # this simple "always predict the training mean" strategy.
         ("DummyRegressor_mean", DummyRegressor(strategy="mean")),
         ("LinearRegression", LinearRegression()),
     ]

@@ -82,6 +82,8 @@ def group_dataset_files(input_path: Path, dataset_files: list[Path]) -> dict[str
 
     grouped_files: dict[str, list[Path]] = {}
     for dataset_file in dataset_files:
+        # Treat the first folder under data/raw as the dataset name. This keeps
+        # datasets such as CICIDS, Zenodo, and BNN-UPC separate in reports.
         relative_path = dataset_file.resolve().relative_to(input_path)
         dataset_name = relative_path.parts[0] if len(relative_path.parts) > 1 else input_path.name
         grouped_files.setdefault(dataset_name, []).append(dataset_file)
@@ -122,8 +124,10 @@ def safe_sheet_name(name: str, used_names: set[str]) -> str:
 def detect_label_column(columns: list[str], requested_label_column: str | None) -> str | None:
     """Use the requested label column or infer one from common label names."""
     if requested_label_column:
+        # If the user names a label column, do not guess a different one.
         return requested_label_column if requested_label_column in columns else None
 
+    # Try exact matches first, then case-insensitive matches for messy headers.
     for candidate in COMMON_LABEL_COLUMNS:
         if candidate in columns:
             return candidate
@@ -352,6 +356,8 @@ def inspect_dataset_group(
     label_column: str | None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[dict[str, str]]]:
     """Inspect one dataset group and return summary and label dataframes."""
+    # These accumulators allow large datasets to be profiled chunk by chunk
+    # without loading every raw file into memory at once.
     label_counts: Counter[str] = Counter()
     feature_stats: dict[str, dict[str, object]] = {}
     file_errors: list[dict[str, str]] = []
@@ -368,6 +374,8 @@ def inspect_dataset_group(
                 chunk = clean_columns(chunk)
                 update_feature_stats(feature_stats, chunk)
 
+                # Label counts are optional. If no label/target column exists,
+                # the script still reports row, feature, missing, and numeric stats.
                 current_label_column = detect_label_column(list(chunk.columns), label_column)
                 if current_label_column:
                     detected_label_column = detected_label_column or current_label_column
@@ -446,6 +454,8 @@ def inspect_datasets(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Grouping prevents unrelated public datasets from being merged into one
+    # summary with incompatible schemas.
     grouped_files = group_dataset_files(input_path, dataset_files)
     dataset_reports: dict[str, pd.DataFrame] = {}
     all_errors: list[dict[str, str]] = []

@@ -76,6 +76,9 @@ def clean_labels(labels: pd.Series) -> pd.Series:
 def infer_protocol(destination_port: pd.Series) -> pd.Series:
     """Infer TCP/UDP from common destination ports when protocol is unavailable."""
     ports = pd.to_numeric(destination_port, errors="coerce").fillna(-1).astype(int)
+
+    # CICIDS does not provide the transport protocol in the selected feature
+    # columns, so this is a lightweight port-based approximation.
     udp_like_ports = [53, 67, 68, 69, 123, 161, 162, 500, 4500, 5060, 5061]
     return pd.Series(np.where(ports.isin(udp_like_ports), "UDP", "TCP"), index=destination_port.index)
 
@@ -181,6 +184,9 @@ def create_sdwan_style_features(
     processed["recommended_bandwidth_percent"] = processed.apply(calculate_bandwidth, axis=1)
 
     output_columns = PROJECT_FEATURE_COLUMNS + [TARGET_COLUMN] + TRACEABILITY_COLUMNS
+
+    # Drop rows with NaN after proxy creation so the sample can be passed
+    # directly into the baseline trainer without additional cleaning.
     return processed[output_columns].replace([np.inf, -np.inf], np.nan).dropna()
 
 
@@ -240,6 +246,9 @@ def build_project_aligned_sample(
             sampled_for_file += take
 
     project_sample = pd.concat(sampled_chunks, ignore_index=True)
+
+    # Save one compact project-aligned sample instead of committing or training
+    # against the full multi-million-row CICIDS2017 dataset.
     project_sample.to_csv(output_path, index=False)
 
     print(f"\nRows scanned: {rows_seen:,}")

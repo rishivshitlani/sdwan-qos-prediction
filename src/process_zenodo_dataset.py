@@ -89,6 +89,9 @@ def load_throughput(input_dir: Path) -> pd.DataFrame:
             print(f"  Warning: throughput file not found: {tput_file.name}")
             continue
         df = pd.read_csv(tput_file, index_col=0)
+
+        # Add provenance columns before concatenation so later summaries can
+        # distinguish NTNU from WUE and trace rows back to the raw CSV.
         df["testbed"] = testbed
         df["source_file"] = tput_file.name
         frames.append(df)
@@ -237,12 +240,16 @@ def build_features(
     join_keys_with_testbed = ["testbed"] + OWD_JOIN_KEYS
 
     if owd is not None and not owd.empty:
+        # OWD rows are already aggregated to one row per radio configuration
+        # and direction, so a left join adds latency fields to throughput rows.
         df = tput.merge(owd, on=join_keys_with_testbed, how="left")
         latency_ms = df["owd_latency_ms"].fillna(-1)
         packet_count = df["owd_packet_count"].fillna(-1).astype(int)
         flow_duration_sec = df["owd_flow_duration_sec"].fillna(-1)
         time_of_day = df["owd_time_of_day"].fillna(-1).astype(int)
     else:
+        # Quick mode skips the large packet-level OWD files. Sentinel values
+        # make it obvious downstream that these fields were not measured.
         df = tput.copy()
         latency_ms = pd.Series(-1.0, index=df.index)
         packet_count = pd.Series(-1, index=df.index)
@@ -335,6 +342,9 @@ def process_zenodo_dataset(
 
     print(f"Loading throughput files from: {input_dir}")
     tput = load_throughput(input_dir)
+
+    # Convert the raw wide format into one row per direction. This gives the
+    # model separate uplink and downlink observations.
     tput = unpivot_uplink_downlink(tput)
     print(f"Throughput rows after UL/DL unpivot: {len(tput):,}")
 

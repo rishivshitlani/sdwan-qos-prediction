@@ -94,6 +94,9 @@ def profile_dataset(
     requested_label_column: str | None,
 ) -> dict[str, object]:
     """First pass: inspect a dataset before writing cleaned output."""
+    # The first pass only profiles columns. The second pass writes cleaned data.
+    # This is needed because we must know all constant-zero columns before we
+    # can safely drop them from every file/chunk.
     column_profile: dict[str, dict[str, object]] = {}
     label_counts: Counter[str] = Counter()
     column_order: list[str] = []
@@ -136,6 +139,8 @@ def calculate_imbalance_summary(label_counts: Counter[str], threshold: float) ->
     """Return class-balance metrics for the detected label column."""
     total_labeled_rows = sum(label_counts.values())
     if total_labeled_rows == 0:
+        # Some public datasets are unlabeled. Keep the report columns present,
+        # but leave imbalance fields blank.
         return {
             "is_imbalanced": "",
             "majority_label": "",
@@ -150,6 +155,9 @@ def calculate_imbalance_summary(label_counts: Counter[str], threshold: float) ->
     sorted_counts = sorted(label_counts.items(), key=lambda item: item[1], reverse=True)
     majority_label, majority_count = sorted_counts[0]
     minority_label, minority_count = sorted_counts[-1]
+
+    # Imbalance is judged using the majority class share. For example, with the
+    # default threshold 0.60, a class holding 60% or more of rows is flagged.
     majority_percent = majority_count / total_labeled_rows
     minority_percent = minority_count / total_labeled_rows
 
@@ -221,6 +229,9 @@ def clean_dataset(
             # Convert infinite values to NaN so a single dropna policy can
             # remove both missing values and invalid numeric infinities.
             chunk = chunk.replace([np.inf, -np.inf], np.nan)
+
+            # Drop the same constant-zero columns discovered in the profiling
+            # pass, then reindex to keep output column order stable.
             chunk = chunk.drop(columns=[column for column in constant_zero_columns if column in chunk.columns])
             chunk = chunk.reindex(columns=output_columns)
 
@@ -332,6 +343,8 @@ def clean_datasets(
     cleaned_dir = output_dir / "cleaned"
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Collect per-dataset outputs first, then concatenate them into project-wide
+    # CSV/Excel reports at the end.
     summaries: list[dict[str, object]] = []
     removed_feature_reports: list[pd.DataFrame] = []
     label_count_reports: list[pd.DataFrame] = []

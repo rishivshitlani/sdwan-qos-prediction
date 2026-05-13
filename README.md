@@ -428,6 +428,30 @@ Example Zenodo baseline command:
 
 In this setup, the model predicts actual throughput from configuration and offered-load features. `recommended_bandwidth_percent`, `jitter_ms`, and `packet_loss_percent` are dropped because they are outcome fields, not pre-deployment inputs for the first throughput prediction experiment.
 
+The same Zenodo baseline can be run with the shorter wrapper:
+
+```bash
+.venv/bin/python src/train_zenodo_baseline.py
+```
+
+By default this processes the Zenodo throughput files with `--skip-owd`, trains the DummyRegressor and Linear Regression baselines, and writes:
+
+```text
+reports/model_results/zenodo_baseline_results.csv
+```
+
+To predict the derived bandwidth recommendation instead, choose that target explicitly:
+
+```bash
+.venv/bin/python src/train_zenodo_baseline.py --target recommended_bandwidth_percent
+```
+
+For this target, the wrapper automatically drops `actual_throughput_mbps` from the model inputs to avoid leakage, because `recommended_bandwidth_percent` is derived from actual/offered throughput. The default output for this run is:
+
+```text
+reports/model_results/zenodo_baseline_recommended_bandwidth_results.csv
+```
+
 ## Notes on Data
 
 This project currently uses synthetic SD-WAN-style QoS data, the Zenodo 5G campus network QoS dataset, and exploratory public network-flow datasets.

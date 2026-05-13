@@ -1,6 +1,7 @@
-import pandas as pd
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 # Keep the synthetic dataset reproducible across runs.
 np.random.seed(42)
@@ -32,6 +33,8 @@ data = pd.DataFrame({
 
 def calculate_bandwidth(row):
     """Create a rule-based QoS bandwidth recommendation for one flow."""
+    # Start with a neutral baseline, then add pressure based on application
+    # importance and observed network quality.
     base = 30
 
     # Give latency-sensitive or business-critical applications more bandwidth.
