@@ -96,12 +96,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--assumed-link-capacity-mbps", type=float, default=150.0)
     parser.add_argument("--chunksize", type=int, default=100_000)
     parser.add_argument(
+        "--skip-owd",
+        action="store_true",
+        # OWD aggregation is now the default so latency, packet_count, and
+        # flow_duration_sec are real aggregated features. This flag keeps a
+        # quick mode available for fast debugging.
+        help="Skip OWD packet aggregation for a faster throughput-only run.",
+    )
+    parser.add_argument(
         "--include-owd",
         action="store_true",
-        # OWD files are large packet-level files. The default baseline stays
-        # quick by using throughput summary files only; pass this flag later if
-        # you want the extra one-way-delay features included.
-        help="Aggregate OWD packet files instead of using the quick throughput-only mode.",
+        help="Deprecated no-op: OWD aggregation is included by default.",
     )
     parser.add_argument(
         "--reuse-processed",
@@ -116,9 +121,9 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
 
-    # Internally the processor expects skip_owd, while the CLI exposes the more
-    # user-friendly positive flag include_owd.
-    args.skip_owd = not args.include_owd
+    if args.include_owd:
+        print("Note: --include-owd is now the default; use --skip-owd only for quick runs.")
+
     args.dataset_name = args.dataset_name or DATASET_NAME_BY_TARGET[args.target_column]
 
     # Keep the original actual-throughput output path for the default run, but

@@ -434,10 +434,16 @@ The same Zenodo baseline can be run with the shorter wrapper:
 .venv/bin/python src/train_zenodo_baseline.py
 ```
 
-By default this processes the Zenodo throughput files with `--skip-owd`, trains the DummyRegressor and Linear Regression baselines, and writes:
+By default this processes the Zenodo throughput files and aggregates OWD packet files, trains the DummyRegressor and Linear Regression baselines, and writes:
 
 ```text
 reports/model_results/zenodo_baseline_results.csv
+```
+
+For a faster throughput-only check, skip the large OWD packet aggregation:
+
+```bash
+.venv/bin/python src/train_zenodo_baseline.py --skip-owd
 ```
 
 To predict the derived bandwidth recommendation instead, choose that target explicitly:
