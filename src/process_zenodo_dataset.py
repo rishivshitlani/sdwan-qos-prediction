@@ -19,7 +19,7 @@ row with that configuration.
 
 Output aligns with the project feature schema used across all datasets:
     latency_ms, jitter_ms, packet_loss_percent, bandwidth_utilization_percent,
-    throughput_mbps, flow_duration_sec, packet_count, protocol, application_type,
+    actual_throughput_mbps, flow_duration_sec, packet_count, protocol, application_type,
     link_type, time_of_day, recommended_bandwidth_percent
 """
 
@@ -50,7 +50,7 @@ PROJECT_FEATURE_COLUMNS = [
     "jitter_ms",
     "packet_loss_percent",
     "bandwidth_utilization_percent",
-    "throughput_mbps",
+    "actual_throughput_mbps",
     "flow_duration_sec",
     "packet_count",
     "protocol",
@@ -60,9 +60,9 @@ PROJECT_FEATURE_COLUMNS = [
 ]
 
 # This derived target is kept for compatibility with the older project schema.
-# For Zenodo modelling, prefer using throughput_mbps as the first real QoS
+# For Zenodo modelling, prefer using actual_throughput_mbps as the first real QoS
 # prediction target. recommended_bandwidth_percent is computed from actual
-# throughput and offered throughput, so throughput_mbps must be dropped if this
+# throughput and offered throughput, so actual_throughput_mbps must be dropped if this
 # derived target is ever used for training.
 TARGET_COLUMN = "recommended_bandwidth_percent"
 
@@ -253,7 +253,7 @@ def build_features(
 
     # Derived compatibility target:
     #   delivered percent = actual throughput / offered throughput.
-    # Do not train a model to predict this while keeping throughput_mbps as an
+    # Do not train a model to predict this while keeping actual_throughput_mbps as an
     # input feature, because that gives the model the answer indirectly.
     recommended = (df["mbpsactual"] / df["mbpsoffered"] * 100).clip(0, 100)
 
@@ -263,7 +263,7 @@ def build_features(
             "jitter_ms": df["meanjitterms"],
             "packet_loss_percent": (df["meanloss"] * 100).clip(0, 100),
             "bandwidth_utilization_percent": bw_util,
-            "throughput_mbps": df["mbpsactual"],
+            "actual_throughput_mbps": df["mbpsactual"],
             "flow_duration_sec": flow_duration_sec,
             "packet_count": packet_count,
             "protocol": "UDP",
@@ -299,7 +299,7 @@ def print_summary(df: pd.DataFrame) -> None:
         "jitter_ms",
         "packet_loss_percent",
         "bandwidth_utilization_percent",
-        "throughput_mbps",
+        "actual_throughput_mbps",
         TARGET_COLUMN,
     ]
     existing = [c for c in numeric_cols if c in df.columns]
@@ -311,8 +311,8 @@ def print_summary(df: pd.DataFrame) -> None:
     print(f"gNB types:  {df['gnb'].value_counts().to_dict()}")
     print("\nModelling note:")
     print(
-        "  For Zenodo, prefer throughput_mbps as the first prediction target. "
-        "If using recommended_bandwidth_percent, drop throughput_mbps from model inputs "
+        "  For Zenodo, prefer actual_throughput_mbps as the first prediction target. "
+        "If using recommended_bandwidth_percent, drop actual_throughput_mbps from model inputs "
         "because the target is derived from actual/offered throughput."
     )
     print(f"\nOutput columns:")

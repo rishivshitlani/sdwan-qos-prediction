@@ -20,7 +20,7 @@ data = pd.DataFrame({
     "jitter_ms": np.random.uniform(0, 80, n),
     "packet_loss_percent": np.random.uniform(0, 8, n),
     "bandwidth_utilization_percent": np.random.uniform(10, 100, n),
-    "throughput_mbps": np.random.uniform(1, 500, n),
+    "actual_throughput_mbps": np.random.uniform(1, 500, n),
     "flow_duration_sec": np.random.uniform(1, 3600, n),
     "packet_count": np.random.randint(10, 100000, n),
     "protocol": np.random.choice(protocols, n),

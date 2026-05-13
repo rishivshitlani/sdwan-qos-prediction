@@ -40,7 +40,7 @@ PROJECT_FEATURE_COLUMNS = [
     "jitter_ms",
     "packet_loss_percent",
     "bandwidth_utilization_percent",
-    "throughput_mbps",
+    "actual_throughput_mbps",
     "flow_duration_sec",
     "packet_count",
     "protocol",
@@ -149,7 +149,7 @@ def create_sdwan_style_features(
 
     # CICIDS Flow Bytes/s is bytes per second; multiply by 8 for bits and
     # divide by 1,000,000 to express it as Mbps.
-    throughput_mbps = df["Flow Bytes/s"] * 8 / 1_000_000
+    actual_throughput_mbps = df["Flow Bytes/s"] * 8 / 1_000_000
 
     # CICIDS2017 does not directly contain SD-WAN QoS fields such as latency,
     # jitter, packet loss, link type, or time of day. The fields below are
@@ -159,8 +159,8 @@ def create_sdwan_style_features(
             "latency_ms": df["Flow IAT Mean"] / 1_000,
             "jitter_ms": df["Flow IAT Std"] / 1_000,
             "packet_loss_percent": np.where(df["RST Flag Count"] > 0, 1.0, 0.0),
-            "bandwidth_utilization_percent": (throughput_mbps / assumed_link_capacity_mbps * 100).clip(0, 100),
-            "throughput_mbps": throughput_mbps,
+            "bandwidth_utilization_percent": (actual_throughput_mbps / assumed_link_capacity_mbps * 100).clip(0, 100),
+            "actual_throughput_mbps": actual_throughput_mbps,
             "flow_duration_sec": df["Flow Duration"] / 1_000_000,
             "packet_count": packet_count,
             "protocol": infer_protocol(df["Destination Port"]),

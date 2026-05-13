@@ -89,7 +89,7 @@ The target SD-WAN-style feature set is:
 | jitter_ms | Variation in packet delay |
 | packet_loss_percent | Percentage of packets lost |
 | bandwidth_utilization_percent | Current link utilisation |
-| throughput_mbps | Measured throughput in Mbps |
+| actual_throughput_mbps | Measured throughput in Mbps |
 | flow_duration_sec | Duration of the traffic flow |
 | packet_count | Number of packets in the flow |
 | protocol | Transport protocol, such as TCP or UDP |
@@ -107,9 +107,9 @@ For the Zenodo dataset, the recommended first modelling target is:
 
 | Target | Description |
 | --- | --- |
-| throughput_mbps | Actual achieved uplink/downlink throughput measured in Mbps |
+| actual_throughput_mbps | Actual achieved uplink/downlink throughput measured in Mbps |
 
-`recommended_bandwidth_percent` is still produced for compatibility with the older project schema, but for Zenodo it is derived from actual throughput divided by offered throughput. To avoid target leakage, do not train a model to predict `recommended_bandwidth_percent` while keeping `throughput_mbps` as an input feature.
+`recommended_bandwidth_percent` is still produced for compatibility with the older project schema, but for Zenodo it is derived from actual throughput divided by offered throughput. To avoid target leakage, do not train a model to predict `recommended_bandwidth_percent` while keeping `actual_throughput_mbps` as an input feature.
 
 ## Scripts
 
@@ -187,7 +187,7 @@ offered_throughput_mbps
 The recommended first target is:
 
 ```text
-throughput_mbps
+actual_throughput_mbps
 ```
 
 The script can also aggregate the large one-way-delay packet files if `--skip-owd` is omitted. That mode may take several minutes because it reads roughly 24 million packet rows.
@@ -277,7 +277,7 @@ latency_ms
 jitter_ms
 packet_loss_percent
 bandwidth_utilization_percent
-throughput_mbps
+actual_throughput_mbps
 flow_duration_sec
 packet_count
 protocol
@@ -395,7 +395,7 @@ pip install -r requirements.txt
 
 ## Machine Learning Plan
 
-The next modelling stage will train and compare supervised regression models for predicting QoS outcomes. For Zenodo, the first target is `throughput_mbps`.
+The next modelling stage will train and compare supervised regression models for predicting QoS outcomes. For Zenodo, the first target is `actual_throughput_mbps`.
 
 Planned models include:
 
@@ -419,7 +419,7 @@ Example Zenodo baseline command:
 .venv/bin/python src/process_zenodo_dataset.py --skip-owd
 .venv/bin/python src/train_baseline.py \
   --input-path data/processed/zenodo_13754300_project_aligned.csv \
-  --target-column throughput_mbps \
+  --target-column actual_throughput_mbps \
   --drop-column recommended_bandwidth_percent \
   --drop-column jitter_ms \
   --drop-column packet_loss_percent \
