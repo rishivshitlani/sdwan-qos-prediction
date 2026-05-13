@@ -79,37 +79,17 @@ The generic processing scripts treat each top-level folder inside `data/raw` as 
 
 For example, files inside `data/raw/cicids/` are processed together as the `cicids` dataset, while future folders such as `data/raw/mawi/` or `data/raw/unibs/` will receive their own reports and cleaned outputs.
 
-## Project Features
+## Dataset Notes
 
-The target SD-WAN-style feature set is:
+Dataset-specific feature definitions are documented next to each dataset instead of in this main project README:
 
-| Feature | Description |
-| --- | --- |
-| latency_ms | Network latency in milliseconds |
-| jitter_ms | Variation in packet delay |
-| packet_loss_percent | Percentage of packets lost |
-| bandwidth_utilization_percent | Current link utilisation |
-| actual_throughput_mbps | Measured throughput in Mbps |
-| flow_duration_sec | Duration of the traffic flow |
-| packet_count | Number of packets in the flow |
-| protocol | Transport protocol, such as TCP or UDP |
-| application_type | Type of traffic, such as voice, video, web, file transfer, or database |
-| link_type | Underlay link type, such as MPLS, Broadband, LTE, or unknown |
-| time_of_day | Hour of day when the flow occurs |
+```text
+data/raw/Zenodo_13754300/README.md
+data/raw/cicids/README.md
+data/synthetic/README.md
+```
 
-The supervised regression target is:
-
-| Target | Description |
-| --- | --- |
-| recommended_bandwidth_percent | Predicted or recommended QoS bandwidth allocation percentage |
-
-For the Zenodo dataset, the recommended first modelling target is:
-
-| Target | Description |
-| --- | --- |
-| actual_throughput_mbps | Actual achieved uplink/downlink throughput measured in Mbps |
-
-`recommended_bandwidth_percent` is still produced for compatibility with the older project schema, but for Zenodo it is derived from actual throughput divided by offered throughput. To avoid target leakage, do not train a model to predict `recommended_bandwidth_percent` while keeping `actual_throughput_mbps` as an input feature.
+For Zenodo, the recommended first modelling target is `actual_throughput_mbps`. `recommended_bandwidth_percent` is still produced as an optional derived target, but `actual_throughput_mbps` must be dropped from model inputs when that target is used.
 
 ## Scripts
 
@@ -147,8 +127,6 @@ It reports:
 * Column names
 * Column data types
 * First 5 rows
-* QoS summary for throughput files
-* Useful input features and possible QoS targets
 
 ### Process Zenodo Dataset
 
@@ -170,25 +148,6 @@ wue_tput_all_Throughput.csv
 ```
 
 It splits each raw row into separate uplink and downlink records and maps the data into the project feature schema.
-
-The most useful Zenodo input features are:
-
-```text
-testbed
-gnb
-sdr
-bw_mhz
-slots
-ratio
-direction
-offered_throughput_mbps
-```
-
-The recommended first target is:
-
-```text
-actual_throughput_mbps
-```
 
 The script can also aggregate the large one-way-delay packet files if `--skip-owd` is omitted. That mode may take several minutes because it reads roughly 24 million packet rows.
 
@@ -270,24 +229,7 @@ This creates an SD-WAN-style sample from CICIDS2017 flow CSVs:
 data/processed/cicids2017_project_aligned_sample.csv
 ```
 
-It maps CICIDS2017 flow columns into project-style features such as:
-
-```text
-latency_ms
-jitter_ms
-packet_loss_percent
-bandwidth_utilization_percent
-actual_throughput_mbps
-flow_duration_sec
-packet_count
-protocol
-application_type
-link_type
-time_of_day
-recommended_bandwidth_percent
-```
-
-Some CICIDS values are proxies because CICIDS2017 does not directly contain SD-WAN QoS fields. For example, latency and jitter are derived from flow inter-arrival time, `link_type` is set to `unknown`, and `time_of_day` is set to `-1`.
+Some CICIDS values are proxies because CICIDS2017 does not directly contain SD-WAN QoS fields. See `data/raw/cicids/README.md` for the raw and project-aligned feature definitions.
 
 ## Current CICIDS2017 Findings
 
