@@ -110,8 +110,9 @@ def evaluate_model(
     y_train: pd.Series,
     y_test: pd.Series,
     dataset_name: str,
+    target_column: str,
 ) -> dict[str, object]:
-    """Train one model and return regression metrics."""
+    """Train one model and return regression metrics for the selected target."""
     pipeline = Pipeline(
         steps=[
             ("preprocess", preprocessor),
@@ -135,7 +136,7 @@ def evaluate_model(
         "run_timestamp": datetime.now().isoformat(timespec="seconds"),
         "dataset": dataset_name,
         "model": model_name,
-        "target": TARGET_COLUMN,
+        "target": target_column,
         "train_rows": len(x_train),
         "test_rows": len(x_test),
         "feature_count": x_train.shape[1],
@@ -184,6 +185,7 @@ def train_baselines(
             y_train=y_train,
             y_test=y_test,
             dataset_name=dataset_name,
+            target_column=target_column,
         )
         for model_name, model in models
     ]

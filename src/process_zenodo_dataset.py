@@ -59,6 +59,11 @@ PROJECT_FEATURE_COLUMNS = [
     "time_of_day",
 ]
 
+# This derived target is kept for compatibility with the older project schema.
+# For Zenodo modelling, prefer using throughput_mbps as the first real QoS
+# prediction target. recommended_bandwidth_percent is computed from actual
+# throughput and offered throughput, so throughput_mbps must be dropped if this
+# derived target is ever used for training.
 TARGET_COLUMN = "recommended_bandwidth_percent"
 
 TRACEABILITY_COLUMNS = [
@@ -70,6 +75,7 @@ TRACEABILITY_COLUMNS = [
     "ratio",
     "rep",
     "direction",
+    "offered_throughput_mbps",
     "source_file",
 ]
 
@@ -244,6 +250,11 @@ def build_features(
         time_of_day = pd.Series(-1, index=df.index)
 
     bw_util = (df["mbpsoffered"] / assumed_link_capacity_mbps * 100).clip(0, 100)
+
+    # Derived compatibility target:
+    #   delivered percent = actual throughput / offered throughput.
+    # Do not train a model to predict this while keeping throughput_mbps as an
+    # input feature, because that gives the model the answer indirectly.
     recommended = (df["mbpsactual"] / df["mbpsoffered"] * 100).clip(0, 100)
 
     out = pd.DataFrame(
@@ -268,6 +279,9 @@ def build_features(
             "ratio": df["ratio"],
             "rep": df["rep"],
             "direction": df["direction"],
+            # Offered traffic load is the key controllable input for predicting
+            # actual throughput on this dataset.
+            "offered_throughput_mbps": df["mbpsoffered"],
             "source_file": df["source_file"],
         }
     )
@@ -295,6 +309,12 @@ def print_summary(df: pd.DataFrame) -> None:
     print(f"\nDirections: {df['direction'].value_counts().to_dict()}")
     print(f"Testbeds:   {df['testbed'].value_counts().to_dict()}")
     print(f"gNB types:  {df['gnb'].value_counts().to_dict()}")
+    print("\nModelling note:")
+    print(
+        "  For Zenodo, prefer throughput_mbps as the first prediction target. "
+        "If using recommended_bandwidth_percent, drop throughput_mbps from model inputs "
+        "because the target is derived from actual/offered throughput."
+    )
     print(f"\nOutput columns:")
     for col in df.columns:
         print(f"  - {col}")
