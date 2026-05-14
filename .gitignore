@@ -24,6 +24,9 @@ data/synthetic/*
 great-benz-980d49/
 reports/
 documents/
+!documents/
+documents/*
+!documents/qos_classes.md
 .DS_Store
 WORKLOG.ipynb
 

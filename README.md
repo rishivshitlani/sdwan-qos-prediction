@@ -2,13 +2,20 @@
 
 This repository contains the implementation work for my MSc AI capstone project: **AI-Driven QoS Prediction in SD-WAN Networks**.
 
-The project explores how machine learning models can be used to predict QoS-related network performance from traffic load, radio/network configuration, and flow-level measurements.
+The project explores how machine learning and deep learning models can predict QoS-related network performance and support SD-WAN-style bandwidth decisions from traffic load, network configuration, and flow-level measurements.
 
 ## Project Aim
 
-The aim of this project is to evaluate whether machine learning models can predict QoS outcomes such as achieved throughput, jitter, and packet loss based on network conditions and configuration.
+The aim of this project is to evaluate whether AI models can predict QoS outcomes such as achieved throughput, jitter, and packet loss based on network conditions and configuration.
 
 The prediction task is treated as a **supervised regression problem**.
+
+The current research direction has two connected stages:
+
+1. Predict observed QoS outcomes from public network datasets.
+2. Use those predictions to explore **Option 2 targets**, where bandwidth recommendation is treated as an optimisation-derived label that reduces SLA violations under link-capacity constraints.
+
+This keeps the first modelling stage reproducible while still moving the thesis toward a more SD-WAN-relevant decision target.
 
 ## Research Questions
 
@@ -41,6 +48,8 @@ sdwan-qos-prediction/
 │   └── train_baseline.py
 |
 ├── notebooks/
+├── documents/
+│   └── qos_classes.md
 ├── reports/
 ├── figures/
 ├── models/
@@ -60,6 +69,8 @@ This project currently supports three dataset paths:
 3. Public flow datasets stored under `data/raw`, currently CICIDS2017 `MachineLearningCVE`
 
 The current main public dataset direction is the Zenodo 5G campus network dataset because it contains QoS-relevant measurements directly: offered throughput, achieved throughput, jitter, packet loss, radio bandwidth, slot configuration, uplink/downlink direction, and testbed metadata.
+
+BNN-UPC and MAWI remain candidate public datasets for the next research stage. They will be assessed separately because they have different structures and may require different feature extraction methods.
 
 CICIDS2017 is retained for exploration only. It is an intrusion-detection dataset, not a QoS dataset, so any SD-WAN-style mapping from CICIDS fields is a proxy and must be treated carefully in the thesis.
 
@@ -90,6 +101,14 @@ data/synthetic/README.md
 ```
 
 For Zenodo, the recommended first modelling target is `actual_throughput_mbps`. `recommended_bandwidth_percent` is still produced as an optional derived target, but `actual_throughput_mbps` must be dropped from model inputs when that target is used.
+
+QoS class definitions and port/protocol mappings are documented separately in:
+
+```text
+documents/qos_classes.md
+```
+
+The initial class policy uses Gold, Silver, and Bronze traffic classes. These classes can later be used as weights or constraints when deriving Option 2 bandwidth-allocation targets.
 
 ## Scripts
 
@@ -335,16 +354,27 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Machine Learning Plan
+## Modelling Plan
 
-The next modelling stage will train and compare supervised regression models for predicting QoS outcomes. For Zenodo, the first target is `actual_throughput_mbps`.
+The modelling plan is split into baseline models and thesis-grade advanced models.
 
-Planned models include:
+The first baseline stage trains supervised regression models for predicting observed QoS outcomes. For Zenodo, the first target is `actual_throughput_mbps`.
+
+Baseline models include:
 
 * Linear Regression
 * Random Forest Regressor
 * Gradient Boosting or XGBoost
 * Support Vector Regression
+
+Advanced models will be added after the baseline is stable:
+
+* Feedforward neural networks for tabular QoS prediction
+* LSTM, GRU, or Temporal Convolutional Network models if time-windowed traffic sequences are created
+* Transformer-based models for sequence-aware QoS prediction if the processed data supports temporal context
+* Graph neural network direction if BNN-UPC topology/routing samples are used
+
+The reason for keeping the baselines is not to claim they are state of the art. They provide sanity checks, interpretability, and comparison points before moving to deep learning models.
 
 Planned evaluation metrics:
 
@@ -354,6 +384,34 @@ Planned evaluation metrics:
 * Inference Time
 
 When multiple public datasets are added, they will be cleaned and evaluated separately so model performance can be compared across datasets.
+
+### Option 2 Target Direction
+
+The current thesis direction is to move beyond a simple observed-throughput target and explore Option 2: an optimisation-based target.
+
+In this direction, the model can predict or support a derived decision target such as:
+
+```text
+recommended_bandwidth_percent
+sla_violation_risk_score
+required_capacity_mbps
+```
+
+The target should be derived from a clearly documented objective, for example:
+
+```text
+minimise weighted SLA violations subject to available link capacity
+```
+
+The QoS class weights are defined in `documents/qos_classes.md`. A simple starting point is:
+
+```text
+Gold   = highest penalty for SLA violation
+Silver = medium penalty
+Bronze = lowest penalty
+```
+
+Important leakage rule: when predicting `recommended_bandwidth_percent`, the model must not use direct outcome columns that were used to derive that target, especially `actual_throughput_mbps`.
 
 Example Zenodo baseline command:
 
