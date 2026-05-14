@@ -98,7 +98,15 @@
 	
 	% THESIS ABSTRACT
 	\begin{abstracts}
-    This report investigates or addresses how Artificial Intelligence(AI) or Machine Learning(ML) techniques can be used in the world of networks and predict Quality of Service (QoS) metrics specifically in SD-WAN environments. A literature review of recent methods demonstrates the effectiveness of supervised and reinforcement learning models for bandwidth estimation, load balancing, and traffic classification. Key contributions, limitations, and future research directions are also discussed.
+Software-Defined Wide Area Networks (SD-WAN) are increasingly used by enterprises to connect distributed sites over multiple link types. Ensuring consistent Quality of Service (QoS) in these environments is challenging because traffic patterns fluctuate dynamically and existing SD-WAN controllers rely on static, reactive policies that act only after degradation has occurred.
+
+This thesis investigates whether machine learning models can predict QoS outcomes in SD-WAN-like network environments using publicly available datasets, enabling a proactive approach to network management. Three research questions guide the work: what AI and ML techniques are suitable for QoS prediction; what are their accuracy, scalability, and real-world limitations; and how predictions can be integrated into production SD-WAN systems.
+
+A literature review of recent research identifies supervised regression, deep learning, graph neural networks, and reinforcement learning as the main techniques applied to QoS prediction and SD-WAN traffic engineering. The primary dataset used for experimentation is the Zenodo 5G campus network dataset (record 13754300), which contains measured throughput, jitter, packet loss, and one-way delay across two 5G testbeds under varied radio configurations.
+
+Baseline experiments on this dataset show that Linear Regression achieves an $R^2$ score of 0.895 and a Mean Absolute Error of 10.55 Mbps when predicting achieved throughput, significantly outperforming a naive mean-prediction baseline ($R^2 = -0.007$). Inference time of 0.032 milliseconds per prediction confirms suitability for near-real-time deployment.
+
+Subsequent experiments will extend the evaluation to Random Forest, Gradient Boosting, Support Vector Regression, and feedforward neural networks. Results, limitations, and directions for future deep-learning-based approaches are discussed.
 	\end{abstracts}
 	
 	%%%% uncomment if needed
@@ -151,10 +159,11 @@
         \item Chapter~\ref{chap:introduction} introduces the research topic, its scope, the problem statement, and the key research questions.
         \item Chapter~\ref{chap:backg} provides background information on SD-WAN, QoS metrics, and the role of AI in modern network management.
         \item Chapter~\ref{chap:lit_review} presents the literature review, including an analysis of academic work on QoS prediction in SD-WAN using AI and ML techniques.
-        \item Chapter~\ref{chap:methodology} outlines the proposed methodology, including dataset selection, feature engineering, model design, and evaluation metrics.
+        \item Chapter~\ref{chap:methodology} outlines the methodology, including dataset selection, feature engineering, model design, and evaluation metrics.
+        \item Chapter~\ref{chap:results} presents the experimental setup and baseline model results on the Zenodo 5G dataset.
         \item Chapter~\ref{chap:timeline} details the project plan, timeline, tools, and supervision checkpoints.
         \item Chapter~\ref{chap:risks} discusses the risks and limitations of the project, including data availability, model complexity, and real-world constraints.
-        \item Chapter~\ref{chap:conclusion} concludes the report by summarizing how the research questions were addressed, highlighting real-world impact, and identifying directions for future work.
+        \item Chapter~\ref{chap:conclusion} concludes the report by summarizing findings, highlighting real-world impact, and identifying directions for future work.
     \end{itemize}
 
 
@@ -232,7 +241,7 @@ The search focused on papers published between 2018 and 2025 to ensure up-to-dat
     \item Availability of experimental results, models, or architecture designs
 \end{itemize}
 
-Although the topic of QoS prediction using AI in SD-WAN is promising, the literature review revealed a limited number of high-quality research papers that directly focus on this specific intersection. Most existing studies either concentrate on general SDN environments or address QoS management without the use of AI or ML techniques. As a result, there is a possibility that the project topic may need to be revised or broadened if further relevant literature cannot be identified. Nonetheless, this review provides valuable insights and highlights key research gaps that warrant further investigation. 
+Although the topic of QoS prediction using AI in SD-WAN is promising, the literature review revealed a limited number of high-quality research papers that directly focus on this specific intersection. Most existing studies either concentrate on general SDN environments or address QoS management without the use of AI or ML techniques. Nonetheless, this review provides valuable insights and highlights key research gaps that warrant further investigation.
 \section{Overview of Selected Papers}
 
 The selected papers cover a range of methods and applications—some focus on predicting traffic load, others on routing or load balancing. Table \ref{tab:lit-summary} categorizes these papers by their core approach and relevance to the research questions.
@@ -327,7 +336,7 @@ Below Table explains the of shortlisted network parameters which often impact th
 \hline
 \textbf{Feature Name} & \textbf{Description} \\
 \hline
-Latency & Round-trip delay between source and destination \\
+Latency & One-way packet delay derived from inter-arrival time (IAT) measurements \\
 \hline
 Packet Size (Average) & Mean size of packets in a flow \\
 \hline
@@ -398,6 +407,105 @@ The following metrics will be used to evaluate and compare the performance of di
 
 Each model (e.g., Linear Regression, Random Forest, XGBoost, SVR, Neural Network) will be evaluated using these metrics to ensure a balanced trade-off between accuracy, interpretability, and speed.
 
+\chapter{Experiments and Results}
+\label{chap:results}
+
+This chapter describes the experimental setup used for the first modelling stage and presents the baseline results obtained on the Zenodo 5G campus network dataset. The goal of this stage is to establish a reproducible benchmark that subsequent models can be compared against.
+
+\section{Experimental Setup}
+
+\subsection{Dataset}
+
+The primary dataset used is the Zenodo 5G campus network dataset (record 13754300)~\cite{raffeck2024zenodo}, collected at two testbeds: the Norwegian University of Science and Technology (NTNU) and the University of W\"{u}rzburg (WUE). The dataset contains iperf3 throughput measurements and one-way delay (OWD) packet captures under varied 5G radio configurations.
+
+The throughput files for both testbeds were loaded and processed as follows:
+
+\begin{itemize}
+    \item Each raw throughput row stores uplink and downlink metrics as paired columns. These were unpivoted into separate rows, one per direction, yielding \textbf{604 rows} in total (302 raw rows $\times$ 2 directions).
+    \item OWD packet files (approximately 24 million rows combined) were aggregated per radio configuration to derive one mean latency estimate per configuration. These estimates were joined back onto the throughput rows.
+    \item All feature columns were mapped to the project schema: \texttt{latency\_ms}, \texttt{jitter\_ms}, \texttt{packet\_loss\_percent}, \texttt{bandwidth\_utilization\_percent}, \texttt{actual\_throughput\_mbps}, \texttt{flow\_duration\_sec}, \texttt{packet\_count}, \texttt{protocol}, \texttt{application\_type}, \texttt{link\_type}, \texttt{time\_of\_day}, plus Zenodo-specific configuration columns: \texttt{bw\_mhz}, \texttt{slots}, \texttt{ratio}, \texttt{direction}, \texttt{offered\_throughput\_mbps}, \texttt{gnb}, \texttt{sdr}, and \texttt{testbed}.
+\end{itemize}
+
+The regression target for this experiment is \textbf{actual\_throughput\_mbps} (achieved throughput in Mbps). The derived column \texttt{recommended\_bandwidth\_percent} was excluded from model inputs to prevent target leakage, as it is computed directly from actual throughput divided by offered throughput.
+
+\subsection{Train/Test Split}
+
+The dataset was split into training and test sets using an 80/20 ratio with a fixed random seed (42) to ensure reproducibility. This produced \textbf{483 training rows} and \textbf{121 test rows}, with \textbf{17 input features} after dropping leakage and traceability columns.
+
+\subsection{Preprocessing Pipeline}
+
+A scikit-learn \texttt{ColumnTransformer} pipeline was applied before model training:
+
+\begin{itemize}
+    \item \textbf{Numeric features:} Median imputation followed by standard scaling (\texttt{StandardScaler}).
+    \item \textbf{Categorical features:} Most-frequent imputation followed by one-hot encoding (\texttt{OneHotEncoder}).
+\end{itemize}
+
+The pipeline was fitted on the training split only and applied consistently to the test split, preventing any data leakage from test rows into preprocessing.
+
+\subsection{Models}
+
+Two baseline models were trained:
+
+\begin{itemize}
+    \item \textbf{DummyRegressor (mean strategy):} Predicts the training-set mean for every input. This serves as the lower-bound sanity-check baseline — any real model should exceed it.
+    \item \textbf{Linear Regression:} A standard ordinary least squares model. Simple, interpretable, and fast. Used as the first real predictive baseline before non-linear models are introduced.
+\end{itemize}
+
+\section{Results}
+
+Table~\ref{tab:baseline_results} presents the evaluation metrics for both models on the held-out test set.
+
+\begin{table}[H]
+\centering
+\caption{Baseline Model Results on Zenodo 5G Dataset (Target: \texttt{actual\_throughput\_mbps})}
+\label{tab:baseline_results}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{Model} & \textbf{MAE (Mbps)} & \textbf{RMSE (Mbps)} & \textbf{R\textsuperscript{2}} & \textbf{Inference (ms/row)} \\
+\hline
+DummyRegressor (mean) & 36.90 & 43.88 & $-$0.007 & 0.015 \\
+\hline
+Linear Regression & 10.55 & 14.15 & 0.895 & 0.032 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Analysis and Discussion}
+
+\subsection{Linear Regression vs. Naive Baseline}
+
+Linear Regression dramatically outperforms the DummyRegressor across all metrics. An $R^2$ of 0.895 means the model explains approximately 89.5\% of the variance in achieved throughput from the input features. The MAE of 10.55 Mbps indicates that, on average, predictions are within approximately 10--11 Mbps of the actual measured throughput.
+
+In contrast, the DummyRegressor achieves an $R^2$ of $-$0.007, confirming that predicting the training mean is no better than random chance for this dataset and provides a meaningful lower bound.
+
+\subsection{Inference Speed}
+
+Linear Regression requires 0.032 milliseconds per prediction, which is well within the latency budget of near-real-time SD-WAN QoS systems. This confirms that even at this baseline stage, the model is operationally suitable for deployment in reactive or predictive network control loops.
+
+\subsection{Feature Notes}
+
+Several feature columns in the Zenodo dataset take a constant value across all rows: \texttt{protocol} is always \texttt{UDP}, \texttt{application\_type} is always \texttt{throughput\_test}, and \texttt{link\_type} is always \texttt{5G}. These columns contribute zero variance to the model and will be investigated for removal in subsequent experiments. The most informative inputs are expected to be \texttt{offered\_throughput\_mbps}, \texttt{bw\_mhz}, \texttt{slots}, \texttt{ratio}, and \texttt{direction}, based on the domain knowledge that radio configuration and offered load directly constrain achievable throughput.
+
+\subsection{Dataset Size Limitation}
+
+The dataset contains only 604 rows after processing, which is small for ensemble or deep learning models. This constraint will be addressed in future work by incorporating OWD-enriched features and exploring additional datasets such as BNN-UPC and MAWI, as recommended by the project supervisor.
+
+\section{Planned Model Extensions}
+
+The baseline results presented above will serve as the comparison benchmark for the following models, which are planned for the next phase of experiments:
+
+\begin{itemize}
+    \item \textbf{Random Forest Regressor} — an ensemble of decision trees that captures non-linear interactions and provides feature importance rankings.
+    \item \textbf{Gradient Boosting / XGBoost} — an iterative boosting model that typically achieves strong performance on structured tabular data.
+    \item \textbf{Support Vector Regression (SVR)} — a kernel-based method evaluated for comparison in lower-dimensional feature subspaces.
+    \item \textbf{Feedforward Neural Network (MLP)} — a shallow fully connected network to assess whether non-linear activation functions improve prediction over the linear baseline.
+    \item \textbf{Transformer or GNN-based approach} — motivated by state-of-the-art results in SD-WAN traffic engineering~\cite{chen2025mteal}, these will be explored conceptually and experimentally if time and dataset size permit.
+\end{itemize}
+
+All planned models will be evaluated using the same train/test split, preprocessing pipeline, and metrics (MAE, RMSE, $R^2$, and inference time) to ensure a fair and reproducible comparison.
+
+
 \chapter{Project Plan and Timeline}
 \label{chap:timeline}
 
@@ -411,25 +519,25 @@ The table below presents the proposed timeline of key project phases and deliver
 \centering
 \caption{Timeline and Key Deliverables}
 \label{tab:project_timeline}
-\begin{tabular}{|p{5cm}|p{8cm}|}
+\begin{tabular}{|p{3.5cm}|p{1.8cm}|p{7.5cm}|}
 \hline
-\textbf{Time Period} & \textbf{Activities and Deliverables} \\
+\textbf{Time Period} & \textbf{Status} & \textbf{Activities and Deliverables} \\
 \hline
-\textbf{June 2025} & Finalize project idea and submit project proposal \\
+\textbf{June 2025} & Done & Finalized project idea and submitted project proposal \\
 \hline
-\textbf{July--Nov 2025} & Background research and initial dataset exploration during Semester 3 \\
+\textbf{July--Nov 2025} & Done & Background research, literature review, and initial dataset exploration \\
 \hline
-\textbf{Dec 2025--Jan 2026} & Finalize project scope, prepare repository structure, and review candidate datasets \\
+\textbf{Dec 2025--Jan 2026} & Done & Finalized project scope, created GitHub repository, reviewed candidate datasets \\
 \hline
-\textbf{Feb--Mar 2026} & Implement initial preprocessing and baseline modelling scripts \\
+\textbf{Feb--Mar 2026} & Done & Implemented preprocessing pipeline and baseline modelling scripts \\
 \hline
-\textbf{Apr--May 2026} & Pivot to Zenodo-first public-data workflow, process QoS features, and run baseline experiments \\
+\textbf{Apr--May 2026} & Done & Pivoted to Zenodo-first workflow; processed QoS features including OWD aggregation; ran Linear Regression baseline ($R^2 = 0.895$) \\
 \hline
-\textbf{June 2026} & Extend modelling to Random Forest, Gradient Boosting/XGBoost, SVR, and neural-network baselines \\
+\textbf{June 2026} & Planned & Extend modelling to Random Forest, Gradient Boosting/XGBoost, SVR, and feedforward neural network \\
 \hline
-\textbf{July 2026} & Analyze results, compare models, write thesis draft, and incorporate supervisor feedback \\
+\textbf{July 2026} & Planned & Analyse and compare all model results; explore BNN-UPC and MAWI datasets; write thesis draft; incorporate supervisor feedback \\
 \hline
-\textbf{August 2026} & Final proofreading, submit final report by 31st August 2026, and prepare for viva \\
+\textbf{August 2026} & Planned & Final proofreading, submit thesis by 31st August 2026, and prepare for viva \\
 \hline
 \end{tabular}
 \end{table}
@@ -491,13 +599,15 @@ Any delays in data access, tool setup, or model convergence could impact the fin
 \chapter{Conclusion}
 \label{chap:conclusion}
 
-This project proposal has outlined a feasible and structured plan for using AI-based models to predict Quality of Service (QoS) in SD-WAN environments. After reviewing recent academic literature, supervised learning models such as Random Forest and Gradient Boosting were identified as promising baseline candidates for QoS prediction based on network flow and configuration characteristics.
+This thesis has investigated the use of machine learning models to predict Quality of Service (QoS) outcomes in SD-WAN-like network environments, with a focus on achieving throughput prediction from radio configuration and traffic load features.
 
-The methodology includes the selection of relevant traffic and configuration features, multiple regression models, and evaluation metrics. Data sourcing remains a limitation because enterprise SD-WAN data is unavailable; therefore, the project will focus on public datasets, primarily Zenodo, and clearly discuss the limits of generalisation.
+The literature review identified a broad range of AI and ML techniques applied to QoS prediction and SD-WAN traffic engineering, ranging from classical supervised learning to graph neural networks and reinforcement learning. The review confirmed that while deep learning and transformer-based models represent the current state of the art, interpretable baseline models remain essential as comparison benchmarks and are computationally feasible for near-real-time deployment.
 
-The plan is scoped appropriately for a Master's level project, balancing innovation with feasibility. The final deliverables will be submitted by August 2026.
+The primary dataset used for experimentation is the Zenodo 5G campus network dataset. After processing, the dataset comprises 604 rows with 17 input features including radio configuration parameters, offered throughput, one-way delay, jitter, and packet loss. Baseline experiments show that Linear Regression achieves an $R^2$ of 0.895 and an MAE of 10.55 Mbps on the held-out test set, significantly outperforming the naive mean-prediction baseline ($R^2 = -0.007$). Inference time of 0.032 milliseconds per prediction is well within the requirements of near-real-time SD-WAN control.
 
-This proposal will guide the implementation phase, and ongoing discussions with the supervisor will refine scope, datasets, and models as needed.
+Data sourcing remains a limitation. An enterprise SD-WAN dataset could not be obtained from the workplace. CICIDS2017, initially explored as a proxy dataset, was found to be unsuitable for QoS prediction because it was designed for intrusion detection and contains attack traffic rather than QoS-labelled measurements. The project therefore relies on the Zenodo dataset as its primary source, with BNN-UPC and MAWI identified as candidates for further exploration.
+
+The next phase of work will extend the evaluation to Random Forest, Gradient Boosting, SVR, and feedforward neural networks, with transformer or graph-based approaches investigated if time permits. All models will be compared against the Linear Regression baseline using the same split, preprocessing pipeline, and metrics to ensure a reproducible evaluation.
 
 \section{Real-World Impact or Benefit}
 
