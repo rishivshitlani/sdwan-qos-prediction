@@ -1,0 +1,544 @@
+%
+% Revision 30 Nov 2023
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+% DOCUMENT CLASS
+\PassOptionsToPackage{disable}{epstopdf-pkg}
+\documentclass[a4paper,12pt]{Classes/RoboticsLaTeX}
+
+% USEFUL PACKAGES
+% Commonly-used packages are included by default.
+% Refer to section "Book - Useful packages" in the class file "Classes/RoboticsLaTeX.cls" for the complete list.
+\usepackage{amsmath}
+\usepackage{amsfonts}
+% Algorithm packages are optional and not currently used in the thesis body.
+% They are disabled so the template builds on a minimal LaTeX installation.
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{graphicx}
+%\usepackage{subfigure}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage[pdftex]{graphicx}
+\usepackage[utf8]{inputenc}
+
+%\usepackage{layout}
+
+\linespread{1.5}
+%\onehalfspacing
+
+% SPECIAL COMMANDS
+% correct bad hyphenation
+\hyphenation{op-tical net-works semi-conduc-tor}
+\hyphenation{par-ti-cu-lar mo-du-le ge-stu-re}
+% INTERLINEA 1.5
+%\renewcommand{\baselinestretch}{1.5}
+
+%% ignore slightly overfull and underfull boxes
+%\hbadness=10000
+%\hfuzz=50pt
+% declare commonly used operators
+%\DeclareMathOperator*{\argmax}{argmax}
+
+% Front page and declaration details for the current thesis draft.
+
+\title{\Large{AI-Driven QoS Prediction in SD-WAN Networks}}
+
+\author{Radhika Shitlani (Preferred Name : Rishiv)}
+\collegeordept{School of Computer Science}
+\university{University of Galway}
+\crest{\includegraphics[width=135mm]{Figures/University_Of_Galway_Logo__Positive_Landscape.png}}
+%\crest{\includegraphics[width=80mm]{Figures/University_of_Galway_logo_2022.png}}
+
+\supervisor{Dr. Jawad Manzoor}
+%\supervisor{Name of the Supervisor}
+%\supervisor{Name of the Co-Supervisor}	
+
+% replace NAME with your name and PROGRAMME with Data Analytics, Artificial Intelligence, or Artificial Intelligence - Online
+\degree{MSc in Computer Science (Artificial Intelligence) - Online}
+\degreedate{31st August 2026}  % Replace with submission date
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% uncomment if glossary needed, see examples in file
+%\makeglossaries
+%\loadglsentries{glossary}
+
+\begin{document}
+		\maketitle
+	
+	% add an empty page after title page
+	\newpage\null\thispagestyle{empty}\newpage
+	
+	% set the number of sectioning levels that get number and appear in the contents
+	\setcounter{secnumdepth}{3}
+	\setcounter{tocdepth}{3}
+	
+	\frontmatter
+	
+	% Replace NAME and THESIS-TITLE with your name and the title of this thesis.
+	\textbf{DECLARATION} 
+	I, Radhika(Rishiv) Shitlani, hereby declare that this thesis, titled ``AI-Driven QoS Prediction in SD-WAN Networks'', and the work presented in it are entirely my own except where explicitly stated otherwise in the text, and that this work has not been previously submitted, in part or whole, to any university or institution for any degree, diploma, or other qualification. 
+	\newline
+	
+	\begin{tabular}{@{}p{.5in}p{4in}@{}}
+		Signature: & ~~\hrulefill \\
+	\end{tabular}
+	\newpage
+	
+	
+	%%%% uncomment if acknowledgements needed
+	%\textbf{Acknowledgement}
+	%
+	%
+	%\newpage\textbf{}
+	
+	
+	% THESIS ABSTRACT
+	\begin{abstracts}
+    This report investigates or addresses how Artificial Intelligence(AI) or Machine Learning(ML) techniques can be used in the world of networks and predict Quality of Service (QoS) metrics specifically in SD-WAN environments. A literature review of recent methods demonstrates the effectiveness of supervised and reinforcement learning models for bandwidth estimation, load balancing, and traffic classification. Key contributions, limitations, and future research directions are also discussed.
+	\end{abstracts}
+	
+	%%%% uncomment if needed
+	\tableofcontents
+	%%%%\listoffigures
+	%%%%\listoftables
+	%%%%\printglossary[title=List of Acronyms,type=\acronymtype]
+		
+	
+	\mainmatter
+	
+	
+	\chapter{Introduction}
+	\label{chap:introduction}
+
+    In today’s digital world, businesses rely heavily on wide area networks (WANs) to connect their offices, data centers, and cloud services. Traditional WANs, which often use expensive and rigid MPLS links, are increasingly being replaced by Software-Defined Wide Area Networks (SD-WAN). SD-WAN offers more flexibility, cost savings, and centralized control. One of the biggest responsibilities of any WAN including SD-WAN is to ensure smooth and reliable network performance. This is referred to as Quality of Service (QoS), which includes important metrics like delay (latency), jitter, packet loss, and available bandwidth.
+
+    In networks, traffic patterns keep fluctuating since different applications have different needs, and the same network might suddenly be overloaded. For example, video conferencing needs minimal or zero packet loss along with low latency, while file downloads just need higher bandwidth. If this is not taken care of, user experience is impacted and organizations may face penalties for violating SLAs(Service Level Agreements). Therefore, maintaining good QoS is not only critical but challenging.
+
+    Currently, most SD-WAN solutions use static policies to configure QoS. This means that network policies are either set manually in advance or adjusted after a problem is detected or reported. The problem here is: by the time a QoS issue is noticed, it might already be too late and user experience is already impacted. This delay can affect real-time applications like voice or video calls, which need instant action. There’s a clear need for a better, smarter solution.
+    
+    This is where Artificial Intelligence (AI) and Machine Learning (ML) come in and can help to resolve the problem. These technologies can learn from historical data and detect patterns in the network traffic. If trained correctly, ML models can predict QoS problems before they happen. For example, if the system learns that high video traffic around 2 PM usually leads to congestion, it can automatically adjust bandwidth or reroute traffic ahead of time. This kind of prediction allows network operators to prevent problems instead of just reacting to them.  
+    
+    \subsection*{Scope and Context}
+    
+    This report explores how AI and ML techniques are being used to predict QoS in SD-WAN networks. Instead of automating policy enforcement (which was part of our earlier plan), the focus here is only on prediction specifically, predicting QoS metrics like latency or bandwidth availability using real traffic data. I tried look at several research papers that have used ML models (like decision trees, neural networks, or reinforcement learning) to make these predictions, and examine how accurate and practical those solutions are.
+    
+    \subsection*{Problem Statement}
+    
+    SD-WAN makes it easier to manage WANs, but maintaining QoS is still a challenge, especially during unexpected traffic surges or link failures. Most QoS-related decisions today are made either too late or based on static rules. Predicting QoS metrics in advance using AI could solve this problem but it’s not clear which methods work best, how accurate they are, or how easy they are to implement in real networks.
+    
+    \subsection*{Research Questions}
+    
+    This report aims to answer the following questions:
+    \begin{itemize}
+        \item \textbf{RQ1}: What types of AI or ML techniques are currently or can be used for predicting QoS in SD-WAN?
+        \item \textbf{RQ2}: What are the benefits and limitations of these approaches in terms of prediction accuracy, scalability, and real-world use?
+        \item \textbf{RQ3}: How can QoS prediction be effectively integrated into SD-WAN production environments to improve network performance?
+    \end{itemize}
+    
+    \subsection*{Methodology}
+    
+    To explore these questions, I conducted a literature review using academic databases like IEEE Xplore, Scopus, and Google Scholar. I searched for terms such as “QoS prediction,” “SD-WAN,” “machine learning in networking,” and “AI-based traffic forecasting.” Papers published between 2020 and 2024 were prioritized, and older foundational works were included when relevant.
+    
+    \subsection*{Structure of the Document}
+    
+    This document is structured as follows:
+    
+    \begin{itemize}
+        \item Chapter~\ref{chap:introduction} introduces the research topic, its scope, the problem statement, and the key research questions.
+        \item Chapter~\ref{chap:backg} provides background information on SD-WAN, QoS metrics, and the role of AI in modern network management.
+        \item Chapter~\ref{chap:lit_review} presents the literature review, including an analysis of academic work on QoS prediction in SD-WAN using AI and ML techniques.
+        \item Chapter~\ref{chap:methodology} outlines the proposed methodology, including dataset selection, feature engineering, model design, and evaluation metrics.
+        \item Chapter~\ref{chap:timeline} details the project plan, timeline, tools, and supervision checkpoints.
+        \item Chapter~\ref{chap:risks} discusses the risks and limitations of the project, including data availability, model complexity, and real-world constraints.
+        \item Chapter~\ref{chap:conclusion} concludes the report by summarizing how the research questions were addressed, highlighting real-world impact, and identifying directions for future work.
+    \end{itemize}
+
+
+    \chapter{Background}
+    \label{chap:backg}
+    
+    This chapter provides foundational knowledge needed to understand the scope and significance of this thesis. It covers the key concepts of Software-Defined Wide Area Networks (SD-WAN), Quality of Service (QoS) metrics in networking, and the role of Artificial Intelligence (AI) in network management. These concepts establish the context for the research discussed in later chapters.
+    
+    \section{Software-Defined Wide Area Networks (SD-WAN)}
+    
+    SD-WAN is an approach to wide area networking that uses software-based control to manage network traffic over multiple connection types, including MPLS, broadband, LTE, and 5G. Unlike traditional WANs that rely on expensive private circuits, SD-WAN provides centralized orchestration and greater flexibility, enabling cost-effective routing based on application priorities and real-time conditions.
+    
+    A typical SD-WAN architecture includes:
+    \begin{itemize}
+        \item \textbf{Edge devices:} Deployed at branch locations to route traffic intelligently.
+        \item \textbf{Central controller:} Makes policy-based routing decisions and pushes configurations to edge devices.
+        \item \textbf{Overlay and underlay networks:} Logical tunnels (overlay) established on top of physical connections (underlay).
+    \end{itemize}
+    
+    SD-WAN improves application performance by enabling dynamic path selection, fast failover, traffic shaping, and visibility across all network segments.
+    
+    \section{Quality of Service (QoS)}
+    
+    QoS in networking refers to the ability to provide different priority levels to different applications, users, or data flows, and to guarantee a certain level of performance for critical traffic. It is crucial for maintaining service-level agreements (SLAs), especially in modern, cloud-centric environments.
+    
+    Common QoS metrics include:
+    \begin{itemize}
+        \item \textbf{Latency:} Time taken for a packet to travel from source to destination.
+        \item \textbf{Jitter:} Variation in packet delay across a network.
+        \item \textbf{Packet loss:} Percentage of packets lost during transmission.
+        \item \textbf{Bandwidth:} Maximum data transfer rate of a link.
+    \end{itemize}
+    
+    Effective QoS management ensures that delay-sensitive applications like VoIP and video conferencing are not negatively affected by congestion or fluctuating traffic.
+    
+    \section{Artificial Intelligence in Network Management}
+    
+    Artificial Intelligence (AI), especially Machine Learning (ML), is increasingly being used in networking to automate and optimize operations. AI techniques can analyze large volumes of network telemetry data to detect anomalies, classify traffic, and predict future network states.
+    
+    In the context of SD-WAN, AI is being used to:
+    \begin{itemize}
+        \item Predict traffic trends and adjust policies proactively.
+        \item Recommend optimal routing paths based on current and expected conditions.
+        \item Forecast QoS metrics and warn of potential SLA violations.
+    \end{itemize}
+    
+    AI models used for QoS prediction typically include supervised learning algorithms (like decision trees and neural networks) and reinforcement learning (used in adaptive routing and load balancing). These models require training on historical network data to make accurate forecasts.
+    
+    \section{Importance of QoS Prediction in SD-WAN}
+    
+    Modern enterprises rely on applications that require consistent and reliable network performance. Static or reactive QoS mechanisms are often too slow to prevent performance issues. QoS prediction enables a more proactive approach—by forecasting issues before they occur, it becomes possible to take preventive actions like re-routing traffic or scaling resources.
+    
+    This capability is especially important in SD-WAN environments where network conditions vary across different links and access types. Accurate QoS prediction can help optimize resource usage, reduce costs, and improve user experience.
+
+\chapter{Literature Review}
+\label{chap:lit_review}
+
+This chapter presents a detailed review of the existing research related to the use of Artificial Intelligence (AI) and Machine Learning (ML) techniques for predicting Quality of Service (QoS) in Software-Defined Wide Area Networks (SD-WAN). The aim is to understand what work has already been done, what methods and models have been proposed, and where gaps still exist. This will help assess the current state of the field and how it supports or challenges the research questions introduced earlier.
+
+\section{Search Strategy and Selection Process}
+
+To gather the literature for this review, a structured search was carried out using academic databases such as IEEE Xplore, Scopus, and Google Scholar. The following search terms were used:
+
+\begin{itemize}
+    \item ``QoS prediction'' AND ``SD-WAN''
+    \item ``AI for QoS'' AND ``Software-defined networking''
+    \item ``Machine learning traffic classification'' AND ``network performance''
+\end{itemize}
+
+The search focused on papers published between 2018 and 2025 to ensure up-to-date relevance. Articles before 2018 were excluded unless they provided foundational knowledge. From an initial pool of documents, key research papers were selected based on the following criteria:
+\begin{itemize}
+    \item Peer-reviewed publications
+    \item Clear focus on QoS, SD-WAN, or software-defined networking
+    \item Use of AI or ML for prediction, classification, or optimization
+    \item Availability of experimental results, models, or architecture designs
+\end{itemize}
+
+Although the topic of QoS prediction using AI in SD-WAN is promising, the literature review revealed a limited number of high-quality research papers that directly focus on this specific intersection. Most existing studies either concentrate on general SDN environments or address QoS management without the use of AI or ML techniques. As a result, there is a possibility that the project topic may need to be revised or broadened if further relevant literature cannot be identified. Nonetheless, this review provides valuable insights and highlights key research gaps that warrant further investigation. 
+\section{Overview of Selected Papers}
+
+The selected papers cover a range of methods and applications—some focus on predicting traffic load, others on routing or load balancing. Table \ref{tab:lit-summary} categorizes these papers by their core approach and relevance to the research questions.
+
+\begin{table}[h]
+\centering
+\caption{Summary and Categorisation of Selected Literature}
+\label{tab:lit-summary}
+\begin{tabular}{|p{3.8cm}|p{3.5cm}|p{5.0cm}|p{2.2cm}|}
+\hline
+\textbf{Paper} & \textbf{AI/ML Technique} & \textbf{Main Focus} & \textbf{Related RQ(s)} \\
+\hline
+Rahman et al.~\cite{rahman2019autoscaling} & Random Forest, DNN & Predicting VNF requirements to maintain QoS and reduce cost & RQ1, RQ2, RQ3 \\
+\hline
+Zheng et al.~\cite{zheng2022applicationaware} & Deep Neural Network + ILP & Classifying application types and assigning QoS-based routes & RQ1, RQ2 \\
+\hline
+Dinh et al.~\cite{dinh2024safeloadbalancing} & DRL (PPO, DDPG) with CBF & Safe traffic routing using AI that respects network constraints & RQ1, RQ2 \\
+\hline
+Quang et al.~\cite{quang2023globalqos} & SABE (Queuing theory-based estimation) & Estimating available bandwidth using passive measurements & RQ2, RQ3 \\
+\hline
+Quang et al.~\cite{quang2022routing} & Centralised Optimization + QoS scheduler & Managing QoS priorities and routing using SD-WAN controller & RQ2, RQ3 \\
+\hline
+Chen et al.~\cite{chen2025mteal} & GNN + MARL & SD-WAN traffic engineering with multi-dimensional QoS metrics & RQ1, RQ2, RQ3 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{AI and ML Methods for QoS Prediction (RQ1)}
+
+Many studies have applied AI techniques to network traffic prediction and management. For instance, Rahman et al. (2019)~\cite{rahman2019autoscaling} used Random Forest and deep learning models to predict how many virtual network functions (VNFs) are needed during a traffic surge. Their models achieved over 95\% accuracy and could prevent service degradation by scaling resources in advance.
+
+Similarly, Zheng et al. (2022)~\cite{zheng2022applicationaware} developed a deep neural network to classify traffic flows based on their latency sensitivity. They then routed this traffic using a QoS-Aware Routing algorithm that selected paths depending on the required delay tolerance. This combination of classification and path assignment showed how AI can directly improve QoS outcomes.
+
+These studies clearly support RQ1 by showing that supervised learning and deep learning can be applied to anticipate traffic needs and assign optimal resources in advance.
+
+\section{Suitability and Real-World Limitations (RQ2)}
+
+Although the above techniques work well in controlled settings, there are challenges when using them in real networks. For example, the deep reinforcement learning (DRL) model by Dinh et al. (2024) ~\cite{dinh2024safeloadbalancing} well in simulations and maintains safe traffic routing using control barrier functions (CBFs). However, DRL requires a lot of training time and GPU support, which may not be available in all SD-WAN deployments.
+
+In contrast, Quang et al. (2023) ~\cite{quang2023globalqos} proposed SABE which is a lightweight method that uses queuing theory to estimate how much bandwidth is left on a link without sending test traffic. This approach avoids complex AI models but may be less flexible when traffic patterns become unpredictable.
+
+This contrast shows that while AI models are powerful, their complexity and resource requirements must be carefully considered before deployment, which directly addresses RQ2.
+
+\section{Integration into SD-WAN Systems (RQ3)}
+
+Several papers also discussed how these models can be integrated into actual SD-WAN systems. For instance, Rahman et al. (2019)~\cite{rahman2019autoscaling} simulated an SD-WAN scenario where their ML models helped reduce both QoS violations and cloud leasing costs by scaling VNFs only when necessary.
+
+Quang et al. (2022)~\cite{quang2022routing} presented a practical example of an enterprise moving from traditional MPLS to SD-WAN. Their central controller dynamically adjusted both routing and QoS scheduling based on the current network status. This shows that AI-based prediction and decision-making can be realistically applied in SD-WAN setups to improve efficiency and reliability.
+
+These findings support RQ3, confirming that AI is not only a research tool but can also be integrated into live systems if the environment supports it.
+
+\section{Research Gaps and Observations}
+
+Despite the progress seen in these papers, several gaps were noticed:
+\begin{itemize}
+    \item Most research focuses on predicting a single QoS metric like latency or bandwidth, rather than multiple metrics at once.
+    \item Most results are based on simulations. Real-world deployment results in live SD-WAN systems are rare.
+    \item Only few research documents are focusing on using Artificial Intelligence in the prediction or correction of QOS. 
+    \item Public datasets related to SD-WAN traffic are hard to find, limiting reproducibility.
+    \item Few works compare the AI predictions directly against decisions made by standard SD-WAN controllers.
+\end{itemize}
+
+Filling these gaps could make QoS prediction models more robust, more generalizable, and more useful for industry.
+
+\section{Summary Of Literature Review So Far}
+
+This review found that AI and ML models especially supervised learning, deep learning, and reinforcement learning, are promising tools for predicting QoS trends in SD-WAN. The models help forecast traffic load, classify application needs, and adjust routing or resource allocation dynamically. However, practical deployment still faces challenges due to training complexity, hardware requirements, and lack of real-world validation.
+
+Although the number of direct studies focused on AI-based QoS prediction in SD-WAN remains limited, the relevance of the topic continues to grow as networks become more software-defined and application-aware. Recent work such as MTEAL~\cite{chen2025mteal} also shows that state-of-the-art SD-WAN traffic engineering is moving beyond simple machine learning models towards graph neural networks, reinforcement learning, and multi-dimensional QoS optimisation. Based on the review and in consultation with Dr. Jawad Manzoor, this project will keep simple models as baselines only, while exploring stronger non-linear and deep-learning-inspired approaches where feasible. The scope will be carefully managed so that the chosen datasets, techniques, and evaluation metrics remain realistic within the resources and time frame of a master's-level project.
+
+
+\chapter{Proposed Methodology}
+\label{chap:methodology}
+
+Based on the findings from the literature review and supervisor feedback, this project will focus on QoS prediction for SD-WAN-like network environments using public network-performance datasets. The primary goal is to predict QoS outcomes such as achieved throughput, latency, jitter, and packet loss from traffic load and network configuration features. The first implemented experiment uses the Zenodo 5G campus network dataset to predict achieved throughput, with bandwidth recommendation treated as a derived secondary target rather than the only objective.
+
+\section{Data Collection}
+This project will use publicly available datasets because a real enterprise SD-WAN dataset could not be obtained. The main public dataset is the Zenodo 5G campus network dataset, which contains throughput, jitter, packet loss, offered load, radio configuration, uplink/downlink direction, and packet-level one-way-delay measurements. Additional datasets suggested for exploration include the BNN-UPC Network Modeling Datasets and MAWI traffic traces. CICIDS2017 will be retained only as an exploratory proxy dataset because it was designed for intrusion detection rather than QoS prediction.
+
+\section{Feature Selection and Pre-processing}
+Common network parameters such as latency, jitter, packet loss, throughput, offered load, packet size, duration, flow count, protocol type, and radio/network configuration will be extracted where available. Data will be cleaned, normalized where appropriate, and split into training and testing sets.
+
+The performance of any machine learning model in network traffic analysis depends heavily on the quality and relevance of the features extracted. I also plan to explore the below network features and parameters to explore and improvise the performance of the selected model. However, this heavily depends on the dataset availability. 
+
+Below Table explains the of shortlisted network parameters which often impact the performance in real world: 
+
+\begin{table}[H]
+\centering
+\caption{Potential Features to be used for ML Model Training}
+\label{tab:features}
+\begin{tabular}{|p{5cm}|p{8cm}|}
+\hline
+\textbf{Feature Name} & \textbf{Description} \\
+\hline
+Latency & Round-trip delay between source and destination \\
+\hline
+Packet Size (Average) & Mean size of packets in a flow \\
+\hline
+Flow Duration & Total time between the first and last packet in a flow \\
+\hline
+Packet Count & Number of packets in the flow \\
+\hline
+Bytes per Second & Average throughput in bytes \\
+\hline
+Packets per Second & Flow rate measured in packets \\
+\hline
+Protocol Type & Transport-layer protocol (TCP, UDP, ICMP) \\
+\hline
+Source/Destination Port & Application hint (e.g., HTTP = 80) \\
+\hline
+TCP Flags (SYN, ACK, FIN) & Used to identify connection status or handshake types \\
+\hline
+Inter-arrival Time & Time between packets in a flow \\
+\hline
+Flow Direction & Inbound or outbound traffic indicator \\
+\hline
+Window Size & TCP receive window size, indicating congestion levels \\
+\hline
+Flow Start Time & Time of day when the flow was initiated \\
+\hline
+Entropy of Packet Size & Statistical variability in packet sizes within a flow \\
+\hline
+\end{tabular}
+\end{table}
+
+These features will be preprocessed and normalized as needed before being used to train the selected machine learning models. Feature selection techniques such as correlation filtering and Recursive Feature Elimination (RFE) may also be applied to reduce redundancy and improve model generalization.
+
+\section{Machine Learning Models Selection}
+
+The primary objective of this project is to predict QoS outcomes from network and traffic features. In the Zenodo experiments, the first supervised regression target is actual achieved throughput in Mbps. A derived bandwidth recommendation percentage may also be evaluated as a secondary target, but care will be taken to avoid target leakage by removing actual throughput from the input features whenever that derived target is used.
+
+To ensure robustness and compare model performance, multiple machine learning algorithms will be implemented and evaluated:
+
+\begin{itemize}
+    \item \textbf{Linear Regression:} A simple and interpretable baseline model that assumes a linear relationship between input features and the selected QoS target.
+    
+    \item \textbf{Random Forest Regressor:} An ensemble model that handles non-linear interactions and feature importance effectively. It is well-suited for tabular data and robust against overfitting.
+    
+    \item \textbf{Gradient Boosting (e.g., XGBoost):} A powerful tree-based ensemble model that iteratively reduces prediction errors. It generally outperforms traditional models in structured data tasks.
+    
+    \item \textbf{Support Vector Regression (SVR):} A kernel-based method that performs well in lower-dimensional feature spaces. It will be tested as a supplementary technique.
+    
+    \item \textbf{Multivariate Regression:} If multiple QoS metrics need to be predicted simultaneously, multivariate regression will be used to capture inter-dependencies between outputs.
+    
+    \item \textbf{Feedforward Neural Network:} A shallow fully connected neural network will be considered to test whether non-linear feature interactions improve QoS prediction over traditional tabular models.
+
+    \item \textbf{Advanced deep learning direction:} If time and data structure permit, transformer-inspired temporal models or graph-based approaches will be investigated conceptually or experimentally, motivated by recent SD-WAN and QoS optimisation work using GNNs and reinforcement learning~\cite{chen2025mteal}.
+\end{itemize}
+
+
+Each model will be trained and evaluated using a consistent set of input features extracted from network flow data (see Table~\ref{tab:features}) and validated using performance metrics such as Mean Absolute Error (MAE), Root Mean Square Error (RMSE), and $R^2$ score. Models will be selected based on both predictive performance and computational feasibility within the scope of the project.
+
+\section{Evaluation Metrics}
+
+The following metrics will be used to evaluate and compare the performance of different machine learning models in this project:
+
+\begin{itemize}
+    \item \textbf{Mean Absolute Error (MAE):} Measures the average absolute difference between predicted and actual QoS target values. It is easy to interpret and less sensitive to outliers.
+    \item \textbf{Root Mean Squared Error (RMSE):} Measures the square root of the average of squared errors. This metric penalizes larger errors more heavily and is useful when large deviations are especially undesirable.
+    \item \textbf{R-squared ($R^2$ Score):} Indicates the proportion of the variance in the dependent variable that is predictable from the input features. Higher values indicate better model performance.
+    \item \textbf{Inference Time:} Measures the time taken by a trained model to make a prediction on new input data. This is critical for SD-WAN systems where real-time or near-real-time decisions are required.
+\end{itemize}
+
+Each model (e.g., Linear Regression, Random Forest, XGBoost, SVR, Neural Network) will be evaluated using these metrics to ensure a balanced trade-off between accuracy, interpretability, and speed.
+
+\chapter{Project Plan and Timeline}
+\label{chap:timeline}
+
+This chapter outlines the structured plan and timeline for completing the capstone project. The schedule is aligned to the final submission deadline of 31st August 2026 and includes time for dataset validation, model development, evaluation, documentation, and supervisor feedback.
+
+\section{Project Milestones}
+
+The table below presents the proposed timeline of key project phases and deliverables:
+
+\begin{table}[H]
+\centering
+\caption{Timeline and Key Deliverables}
+\label{tab:project_timeline}
+\begin{tabular}{|p{5cm}|p{8cm}|}
+\hline
+\textbf{Time Period} & \textbf{Activities and Deliverables} \\
+\hline
+\textbf{June 2025} & Finalize project idea and submit project proposal \\
+\hline
+\textbf{July--Nov 2025} & Background research and initial dataset exploration during Semester 3 \\
+\hline
+\textbf{Dec 2025--Jan 2026} & Finalize project scope, prepare repository structure, and review candidate datasets \\
+\hline
+\textbf{Feb--Mar 2026} & Implement initial preprocessing and baseline modelling scripts \\
+\hline
+\textbf{Apr--May 2026} & Pivot to Zenodo-first public-data workflow, process QoS features, and run baseline experiments \\
+\hline
+\textbf{June 2026} & Extend modelling to Random Forest, Gradient Boosting/XGBoost, SVR, and neural-network baselines \\
+\hline
+\textbf{July 2026} & Analyze results, compare models, write thesis draft, and incorporate supervisor feedback \\
+\hline
+\textbf{August 2026} & Final proofreading, submit final report by 31st August 2026, and prepare for viva \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Tools and Resources}
+
+The following tools and platforms will be used throughout the project:
+\begin{itemize}
+    \item \textbf{Programming:} Python (pandas, scikit-learn, XGBoost, TensorFlow/Keras)
+    \item \textbf{Environment:} JupyterLab / VS Code
+    \item \textbf{Data Analysis:} matplotlib, seaborn
+    \item \textbf{Documentation:} Overleaf for LaTeX-based report writing
+    \item \textbf{Version Control:} GitHub (for code management and backups)
+\end{itemize}
+
+\section{Supervision and Checkpoints}
+
+Regular meetings and email check-ins with the supervisor, Dr. Jawad Manzoor, will be planned around key milestones. Ad-hoc consultation via email or MS Teams will be arranged when feedback is needed between reviews.
+
+\chapter{Risks and Limitations}
+\label{chap:risks}
+
+This chapter outlines the potential risks and limitations associated with the proposed project, along with mitigation strategies. Identifying these factors in advance helps to set realistic expectations and provides contingency planning to ensure the project stays on track.
+
+
+\section{Data Availability}
+
+One of the primary risks is the limited availability of real-world SD-WAN traffic datasets, particularly those with labelled QoS metrics. While public datasets provide valuable traffic data, they may not directly reflect enterprise SD-WAN-specific behaviour or QoS classifications.
+
+An internal workplace dataset could not be obtained, so this project will rely on public datasets. This limitation will be explicitly discussed in the thesis to avoid over-claiming real-world SD-WAN generalisability.
+
+\textbf{Mitigation:} The project will prioritize public datasets with direct QoS measurements, especially the Zenodo 5G campus network dataset. CICIDS2017 will be used only as an exploratory proxy dataset, while BNN-UPC and MAWI will be assessed for possible additional experiments.
+
+
+\section{Model Complexity and Training Resources}
+
+Advanced models like deep neural networks or ensemble methods (e.g., XGBoost) may require significant computational power, especially for hyperparameter tuning and training on large datasets.
+
+\textbf{Mitigation:} The project will begin with simpler models (e.g., Linear Regression, Random Forest), and only progress to more complex architectures if time and resources allow. Cloud-based resources (e.g., Google Colab, Kaggle Kernels) may be leveraged for experimentation if needed.
+
+\section{Feature Engineering Challenges}
+
+Not all features listed in the methodology may be available or relevant across all datasets. Inconsistent data schemas, missing values, or incompatible units may limit the effectiveness of certain features.
+
+\textbf{Mitigation:} A flexible feature selection pipeline will be used. Feature selection methods like correlation analysis and Recursive Feature Elimination (RFE) will be applied to retain the most informative subset. Feature engineering techniques will be adapted depending on the final dataset used.
+
+\section{Evaluation in Real-World Context}
+
+Since the proposed work is likely to use offline datasets, the final results may not directly translate to real-time SD-WAN deployment without further validation. Simulations might not capture dynamic, production-grade behaviors such as live failovers or multi-path routing decisions.
+
+\textbf{Mitigation:} The project will focus on building and validating a working proof-of-concept model using offline data. The limitations of generalization will be clearly documented, and suggestions for real-time deployment and testing will be proposed as future work.
+
+\section{Time Constraints}
+
+Any delays in data access, tool setup, or model convergence could impact the final delivery timeline.
+
+\textbf{Mitigation:} A flexible and modular project plan has been developed, with early-stage tasks front-loaded to reduce later risk. Regular checkpoints with the supervisor will help track progress and address blockers quickly.
+
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+This project proposal has outlined a feasible and structured plan for using AI-based models to predict Quality of Service (QoS) in SD-WAN environments. After reviewing recent academic literature, supervised learning models such as Random Forest and Gradient Boosting were identified as promising baseline candidates for QoS prediction based on network flow and configuration characteristics.
+
+The methodology includes the selection of relevant traffic and configuration features, multiple regression models, and evaluation metrics. Data sourcing remains a limitation because enterprise SD-WAN data is unavailable; therefore, the project will focus on public datasets, primarily Zenodo, and clearly discuss the limits of generalisation.
+
+The plan is scoped appropriately for a Master's level project, balancing innovation with feasibility. The final deliverables will be submitted by August 2026.
+
+This proposal will guide the implementation phase, and ongoing discussions with the supervisor will refine scope, datasets, and models as needed.
+
+\section{Real-World Impact or Benefit}
+
+The core value of this project lies in enabling proactive Quality of Service (QoS) management in SD-WAN environments through AI-driven predictions. In current networks, QoS violations are often addressed reactively, after user experience is already affected. This project aims to change that by predicting issues in advance using real-time flow-level features.
+
+\textbf{Practical Benefits in Real Networks:}
+\begin{itemize}
+    \item \textbf{Proactive Network Management:} Helps operators act before congestion or SLA violations occur, reducing downtime and customer complaints.
+    \item \textbf{Cost Optimization:} Enables intelligent bandwidth allocation and resource scaling, potentially reducing overprovisioning or cloud leasing costs.
+    \item \textbf{Improved QoE (Quality of Experience):} Real-time predictions allow better support for critical applications like video calls, VoIP, and live collaboration tools.
+    \item \textbf{Scalability:} The approach is suitable for large enterprise SD-WANs that span multiple locations and require dynamic QoS adjustments.
+\end{itemize}
+
+
+\section{Future Work}
+
+Based on the current findings, future research should explore the following directions:
+\begin{itemize}
+    \item \textbf{Multi-Metric Prediction:} Extend from bandwidth-only prediction to include latency, jitter, and packet loss simultaneously for holistic QoS control.
+    \item \textbf{Hybrid AI Models:} Explore combining supervised learning with reinforcement learning for dynamic decision-making based on predicted states.
+    \item \textbf{Real-Time Integration:} Integrate the predictive model directly into SD-WAN controllers or orchestration platforms to trigger policy updates.
+    \item \textbf{Cross-Domain Generalisation:} Test the model on different network topologies and providers to assess adaptability across domains.
+\end{itemize}
+
+By addressing these improvements, the project could evolve into a plug-in or microservice within SD-WAN platforms that provides predictive QoS as a built-in capability.
+
+\section{Final Remarks}
+
+AI and ML hold significant promise for improving QoS in SD-WAN by enabling proactive, predictive management rather than reactive troubleshooting. While the current body of research is still emerging and somewhat fragmented, there is a strong foundation to build upon. With more focused work and collaboration between academia and industry, AI-driven QoS prediction can become a core feature of future network systems.
+
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\bibliographystyle{plainnat}
+	\renewcommand{\bibname}{References}           % change default name Bibliography to References
+	\bibliography{references}                     % BibTeX References file, references.bib
+	\addcontentsline{toc}{chapter}{References}    % add References to TOC
+    
+	%%% uncomment if Appendices needed
+	%\appendix
+	%\chapter{Appendix-A-Title} 
+	%\label{chap:appendix_a}
+	
+	%\chapter{Appendix-B-Title} 
+	%\label{chap:appendix_b}
+\end{document}

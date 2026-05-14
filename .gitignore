@@ -26,3 +26,18 @@ reports/
 documents/
 .DS_Store
 WORKLOG.ipynb
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.brf
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.synctex.gz
+missfont.log

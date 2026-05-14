@@ -1,0 +1,10 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{grfext}[2026/05/14 Minimal local shim for epstopdf-base]
+
+% The thesis template uses PNG/PDF figures only. TinyTeX in this environment
+% does not include grfext.sty, but epstopdf-base loads it for optional EPS
+% extension handling. These no-op definitions are enough for this document.
+\providecommand{\AppendGraphicsExtensions}[1]{}
+\providecommand{\PrependGraphicsExtensions}[1]{}
+
+\endinput
