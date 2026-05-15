@@ -1,8 +1,8 @@
 """Train baseline regression models for SD-WAN QoS prediction.
 
-Loads a project-style CSV, trains DummyRegressor, Linear Regression,
+Loads a project-style CSV, trains DummyRegressor, Linear Regression, SVR,
 Random Forest, and XGBoost, then writes holdout and k-fold cross-validation
-metrics to reports/model_results/model_results.csv.
+metrics plus feature-importance output to reports/model_results/.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.svm import SVR
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +105,7 @@ def build_model_specs(random_state: int) -> list[ModelSpec]:
     specs = [
         ModelSpec("DummyRegressor_mean", DummyRegressor(strategy="mean"), scale_numeric=False),
         ModelSpec("LinearRegression", LinearRegression(), scale_numeric=True),
+        ModelSpec("SVR_rbf", SVR(kernel="rbf", C=10.0, epsilon=0.1), scale_numeric=True),
         ModelSpec(
             "RandomForestRegressor",
             RandomForestRegressor(n_estimators=200, random_state=random_state, n_jobs=-1),
@@ -154,6 +156,7 @@ def _xgb_error(exc: Exception) -> str:
 def _skipped_result(
     spec: ModelSpec,
     status: str,
+    message: str,
     train_rows: int,
     test_rows: int,
     feature_count: int,
@@ -167,7 +170,7 @@ def _skipped_result(
         "model": spec.name,
         "target": target_column,
         "status": status,
-        "error_message": spec.skip_reason,
+        "error_message": message,
         "train_rows": train_rows,
         "test_rows": test_rows,
         "feature_count": feature_count,
@@ -216,6 +219,51 @@ def _run_cv(
     }
 
 
+def _feature_importance_rows(
+    pipeline: Pipeline,
+    spec: ModelSpec,
+    dataset_name: str,
+    target_column: str,
+) -> list[dict[str, object]]:
+    """Extract feature importances from fitted RF/XGBoost pipelines."""
+    model = pipeline.named_steps["model"]
+    importances = getattr(model, "feature_importances_", None)
+    if importances is None:
+        return []
+
+    preprocessor = pipeline.named_steps["preprocess"]
+    try:
+        feature_names = preprocessor.get_feature_names_out()
+    except Exception:
+        feature_names = [f"feature_{i}" for i in range(len(importances))]
+
+    total = float(np.sum(importances))
+    normalized = importances / total if total > 0 else importances
+
+    rows = []
+    for rank, (feature, importance, normalized_importance) in enumerate(
+        sorted(
+            zip(feature_names, importances, normalized),
+            key=lambda item: item[1],
+            reverse=True,
+        ),
+        start=1,
+    ):
+        rows.append(
+            {
+                "run_timestamp": datetime.now().isoformat(timespec="seconds"),
+                "dataset": dataset_name,
+                "model": spec.name,
+                "target": target_column,
+                "rank": rank,
+                "feature": feature,
+                "importance": float(importance),
+                "importance_normalized": float(normalized_importance),
+            }
+        )
+    return rows
+
+
 def evaluate_model(
     spec: ModelSpec,
     preprocessor: ColumnTransformer,
@@ -227,7 +275,7 @@ def evaluate_model(
     target_column: str,
     cv_folds: int,
     random_state: int,
-) -> dict[str, object]:
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     pipeline = Pipeline(steps=[("preprocess", preprocessor), ("model", spec.model)])
 
     cv_results = _run_cv(pipeline, x_train, y_train, cv_folds, random_state)
@@ -245,7 +293,7 @@ def evaluate_model(
     if not np.isfinite(predictions).all():
         raise ValueError("Model produced non-finite predictions.")
 
-    return {
+    result = {
         "run_timestamp": datetime.now().isoformat(timespec="seconds"),
         "dataset": dataset_name,
         "model": spec.name,
@@ -263,6 +311,12 @@ def evaluate_model(
         "inference_time_sec":      inference_time_sec,
         "inference_time_ms_per_row": inference_time_sec / len(x_test) * 1000,
     }
+    return result, _feature_importance_rows(pipeline, spec, dataset_name, target_column)
+
+
+def feature_importance_output_path(output_path: Path) -> Path:
+    """Create the sibling CSV path for model feature importances."""
+    return output_path.with_name(f"{output_path.stem}_feature_importance{output_path.suffix}")
 
 
 def train_baselines(
@@ -288,6 +342,7 @@ def train_baselines(
     }
 
     results = []
+    feature_importance_rows: list[dict[str, object]] = []
     for spec in build_model_specs(random_state):
         skipped_kwargs = dict(
             spec=spec,
@@ -300,11 +355,11 @@ def train_baselines(
         )
 
         if spec.model is None:
-            results.append(_skipped_result(status="skipped", **skipped_kwargs))
+            results.append(_skipped_result(status="skipped", message=spec.skip_reason, **skipped_kwargs))
             continue
 
         try:
-            results.append(evaluate_model(
+            result, model_feature_importances = evaluate_model(
                 spec=spec,
                 preprocessor=clone(preprocessors[spec.scale_numeric]),
                 x_train=x_train, x_test=x_test,
@@ -313,14 +368,22 @@ def train_baselines(
                 target_column=target_column,
                 cv_folds=cv_folds,
                 random_state=random_state,
-            ))
+            )
+            results.append(result)
+            feature_importance_rows.extend(model_feature_importances)
         except Exception as exc:
-            spec = spec._replace(skip_reason=f"{type(exc).__name__}: {exc}")
-            results.append(_skipped_result(status="failed", **skipped_kwargs))
+            results.append(
+                _skipped_result(
+                    status="failed",
+                    message=f"{type(exc).__name__}: {exc}",
+                    **skipped_kwargs,
+                )
+            )
 
     results_df = pd.DataFrame(results)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(output_path, index=False)
+    pd.DataFrame(feature_importance_rows).to_csv(feature_importance_output_path(output_path), index=False)
     return results_df
 
 

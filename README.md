@@ -363,6 +363,7 @@ The first baseline stage trains supervised regression models for predicting obse
 Baseline models include:
 
 * Linear Regression
+* Support Vector Regression (SVR)
 * Random Forest Regressor
 * Gradient Boosting or XGBoost
 * Support Vector Regression
@@ -434,11 +435,19 @@ The same Zenodo baseline can be run with the shorter wrapper:
 .venv/bin/python src/train_zenodo_baseline.py
 ```
 
-By default this processes the Zenodo throughput files and aggregates OWD packet files, trains DummyRegressor, Linear Regression, Random Forest, and XGBoost baselines, and writes:
+By default this processes the Zenodo throughput files and aggregates OWD packet files, trains DummyRegressor, Linear Regression, SVR, Random Forest, and XGBoost baselines, and writes:
 
 ```text
 reports/model_results/zenodo_baseline_results.csv
 ```
+
+The same run also writes feature-importance rows for models that expose them:
+
+```text
+reports/model_results/zenodo_baseline_results_feature_importance.csv
+```
+
+At present this includes Random Forest and XGBoost. These outputs support the thesis discussion about which engineered features influence QoS prediction most strongly.
 
 The results CSV includes holdout-test metrics plus k-fold cross-validation summaries:
 
@@ -451,7 +460,7 @@ training_time_sec, inference_time_sec, inference_time_ms_per_row
 
 If XGBoost cannot run because a native runtime dependency is missing, the script records the XGBoost row with `status=skipped` and keeps the other model results.
 
-Preprocessing is model-specific: Linear Regression uses median imputation plus `StandardScaler` for numeric features, while Random Forest and XGBoost use median imputation without numeric scaling because tree-based models do not require scaled inputs. Each model receives a fresh cloned preprocessor before fitting, so fitted preprocessing state is not shared between models.
+Preprocessing is model-specific: Linear Regression and SVR use median imputation plus `StandardScaler` for numeric features, while Random Forest and XGBoost use median imputation without numeric scaling because tree-based models do not require scaled inputs. Each model receives a fresh cloned preprocessor before fitting, so fitted preprocessing state is not shared between models.
 
 The default is 5-fold cross-validation. It can be changed or disabled:
 
