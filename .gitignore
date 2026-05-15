@@ -23,10 +23,16 @@ data/synthetic/*
 !data/synthetic/README.md
 great-benz-980d49/
 reports/
+!reports/
+reports/*
+!reports/model_results/
+reports/model_results/*
+!reports/model_results/*.csv
 documents/
 !documents/
 documents/*
 !documents/qos_classes.md
+!documents/model_explanation.md
 .DS_Store
 WORKLOG.ipynb
 
