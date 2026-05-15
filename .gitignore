@@ -15,6 +15,9 @@ data/raw/Zenodo_13754300/*
 !data/raw/cicids/
 data/raw/cicids/*
 !data/raw/cicids/README.md
+!data/raw/BNN_UPC/
+data/raw/BNN_UPC/*
+!data/raw/BNN_UPC/README.md
 data/interim/
 data/processed/
 data/synthetic/

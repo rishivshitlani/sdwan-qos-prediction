@@ -8,3 +8,5 @@ jupyter
 joblib
 scapy
 openpyxl
+networkx
+pyyaml
