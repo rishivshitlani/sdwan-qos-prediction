@@ -93,6 +93,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--test-size", type=float, default=0.20)
     parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument(
+        "--cv-folds",
+        type=int,
+        default=5,
+        help="Number of k-fold cross-validation folds to run on the training split. Use 0 or 1 to disable.",
+    )
     parser.add_argument("--assumed-link-capacity-mbps", type=float, default=150.0)
     parser.add_argument("--chunksize", type=int, default=100_000)
     parser.add_argument(
@@ -163,6 +169,7 @@ if __name__ == "__main__":
         test_size=args.test_size,
         random_state=args.random_state,
         drop_columns=drop_columns,
+        cv_folds=args.cv_folds,
     )
 
     print(f"\nZenodo baseline results written to: {args.output_path}")

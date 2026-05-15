@@ -434,10 +434,30 @@ The same Zenodo baseline can be run with the shorter wrapper:
 .venv/bin/python src/train_zenodo_baseline.py
 ```
 
-By default this processes the Zenodo throughput files and aggregates OWD packet files, trains the DummyRegressor and Linear Regression baselines, and writes:
+By default this processes the Zenodo throughput files and aggregates OWD packet files, trains DummyRegressor, Linear Regression, Random Forest, and XGBoost baselines, and writes:
 
 ```text
 reports/model_results/zenodo_baseline_results.csv
+```
+
+The results CSV includes holdout-test metrics plus k-fold cross-validation summaries:
+
+```text
+status, error_message
+mae, rmse, r2_score
+cv_folds, cv_mae_mean, cv_mae_std, cv_rmse_mean, cv_rmse_std, cv_r2_mean, cv_r2_std
+training_time_sec, inference_time_sec, inference_time_ms_per_row
+```
+
+If XGBoost cannot run because a native runtime dependency is missing, the script records the XGBoost row with `status=skipped` and keeps the other model results.
+
+Preprocessing is model-specific: Linear Regression uses median imputation plus `StandardScaler` for numeric features, while Random Forest and XGBoost use median imputation without numeric scaling because tree-based models do not require scaled inputs. Each model receives a fresh cloned preprocessor before fitting, so fitted preprocessing state is not shared between models.
+
+The default is 5-fold cross-validation. It can be changed or disabled:
+
+```bash
+.venv/bin/python src/train_zenodo_baseline.py --cv-folds 3
+.venv/bin/python src/train_zenodo_baseline.py --cv-folds 0
 ```
 
 For a faster throughput-only check, skip the large OWD packet aggregation:
