@@ -1,9 +1,8 @@
 """Train baseline regression models for SD-WAN QoS prediction.
 
-This script is the first modelling step for the project. It loads a project-style
-CSV dataset, trains baseline and tree/boosting models, then writes comparable
-holdout-test and k-fold cross-validation metrics to
-``reports/model_results/model_results.csv``.
+Loads a project-style CSV, trains DummyRegressor, Linear Regression,
+Random Forest, and XGBoost, then writes holdout and k-fold cross-validation
+metrics to reports/model_results/model_results.csv.
 """
 
 from __future__ import annotations
@@ -13,6 +12,7 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -33,8 +33,6 @@ DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "synthetic" / "sdwan_qos_synthetic.
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "model_results.csv"
 TARGET_COLUMN = "recommended_bandwidth_percent"
 DEFAULT_DROP_COLUMNS = [
-    # These CICIDS traceability columns are useful for auditing rows, but they
-    # should not be used as model inputs for QoS bandwidth prediction.
     "cicids_attack_label",
     "source_file",
     "destination_port",
@@ -42,8 +40,14 @@ DEFAULT_DROP_COLUMNS = [
 ]
 
 
+class ModelSpec(NamedTuple):
+    name: str
+    model: object | None
+    scale_numeric: bool
+    skip_reason: str = ""
+
+
 def build_one_hot_encoder() -> OneHotEncoder:
-    """Create a OneHotEncoder compatible with different scikit-learn versions."""
     try:
         return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
     except TypeError:
@@ -51,16 +55,12 @@ def build_one_hot_encoder() -> OneHotEncoder:
 
 
 def load_dataset(input_path: Path, target_column: str) -> pd.DataFrame:
-    """Read the modelling dataset and confirm the target column exists."""
     if not input_path.exists():
         raise FileNotFoundError(f"Input dataset does not exist: {input_path}")
-
     data = pd.read_csv(input_path)
     data.columns = data.columns.astype(str).str.strip()
-
     if target_column not in data.columns:
         raise ValueError(f"Target column '{target_column}' not found in {input_path}")
-
     return data
 
 
@@ -69,162 +69,155 @@ def split_features_and_target(
     target_column: str,
     drop_columns: list[str],
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Separate model inputs from the regression target."""
-    # Only drop columns that are present so the same trainer can be reused with
-    # synthetic, CICIDS-derived, and Zenodo datasets.
-    columns_to_drop = [column for column in drop_columns if column in data.columns]
+    columns_to_drop = [c for c in drop_columns if c in data.columns]
     features = data.drop(columns=[target_column, *columns_to_drop])
-
-    # Regression metrics require a numeric target. Non-numeric or missing target
-    # values are converted to NaN and removed below.
     target = pd.to_numeric(data[target_column], errors="coerce")
-
-    valid_target_mask = target.notna()
-    return features.loc[valid_target_mask].copy(), target.loc[valid_target_mask].copy()
+    mask = target.notna()
+    return features.loc[mask].copy(), target.loc[mask].copy()
 
 
 def build_preprocessor(features: pd.DataFrame, scale_numeric: bool) -> ColumnTransformer:
-    """Build preprocessing for numeric and categorical project features."""
-    # Linear models benefit from scaled numeric inputs. Tree-based models do not
-    # need scaling, so their preprocessor only imputes numeric values.
-    numeric_columns = features.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_columns = [column for column in features.columns if column not in numeric_columns]
+    numeric_cols = features.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = [c for c in features.columns if c not in numeric_cols]
 
     numeric_steps: list[tuple[str, object]] = [("imputer", SimpleImputer(strategy="median"))]
     if scale_numeric:
-        # Scaling is enabled only for models such as Linear Regression where
-        # feature magnitude affects the fitted coefficients.
         numeric_steps.append(("scaler", StandardScaler()))
-
-    numeric_pipeline = Pipeline(steps=numeric_steps)
-    categorical_pipeline = Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("onehot", build_one_hot_encoder()),
-        ]
-    )
 
     return ColumnTransformer(
         transformers=[
-            ("numeric", numeric_pipeline, numeric_columns),
-            ("categorical", categorical_pipeline, categorical_columns),
+            ("numeric", Pipeline(steps=numeric_steps), numeric_cols),
+            (
+                "categorical",
+                Pipeline(steps=[
+                    ("imputer", SimpleImputer(strategy="most_frequent")),
+                    ("onehot", build_one_hot_encoder()),
+                ]),
+                categorical_cols,
+            ),
         ],
-        # Drop anything not explicitly routed through the numeric or categorical
-        # pipelines. This keeps the feature matrix predictable.
         remainder="drop",
     )
 
 
-def build_model_specs(random_state: int) -> list[tuple[str, object | None, str, bool]]:
-    """Return models to evaluate, including a graceful XGBoost fallback."""
-    # The final boolean tells the trainer whether the model should receive
-    # scaled numeric features. This keeps preprocessing tailored to the model
-    # family instead of applying StandardScaler to every estimator.
-    models: list[tuple[str, object | None, str, bool]] = [
-        # DummyRegressor is the sanity-check baseline: real models should beat
-        # this simple "always predict the training mean" strategy.
-        ("DummyRegressor_mean", DummyRegressor(strategy="mean"), "", False),
-        ("LinearRegression", LinearRegression(), "", True),
-        (
+def build_model_specs(random_state: int) -> list[ModelSpec]:
+    specs = [
+        ModelSpec("DummyRegressor_mean", DummyRegressor(strategy="mean"), scale_numeric=False),
+        ModelSpec("LinearRegression", LinearRegression(), scale_numeric=True),
+        ModelSpec(
             "RandomForestRegressor",
             RandomForestRegressor(n_estimators=200, random_state=random_state, n_jobs=-1),
-            "",
-            False,
+            scale_numeric=False,
         ),
     ]
 
-    # XGBoost is a required advanced baseline for the project, but its Python
-    # package depends on a native OpenMP library on macOS. If that runtime is
-    # missing locally, keep the training run usable and record the skip reason
-    # in the results CSV.
     try:
         from xgboost import XGBRegressor
-    except Exception as error:  # pragma: no cover - depends on local native libs
-        models.append(("XGBRegressor", None, format_xgboost_error(error), False))
+    except Exception as exc:
+        specs.append(ModelSpec("XGBRegressor", None, scale_numeric=False, skip_reason=_xgb_error(exc)))
     else:
-        models.append(
-            (
-                "XGBRegressor",
-                XGBRegressor(
-                    n_estimators=200,
-                    learning_rate=0.05,
-                    max_depth=4,
-                    subsample=0.9,
-                    colsample_bytree=0.9,
-                    objective="reg:squarederror",
-                    eval_metric="rmse",
-                    random_state=random_state,
-                    n_jobs=-1,
-                    verbosity=0,
-                ),
-                "",
-                False,
-            )
-        )
+        specs.append(ModelSpec(
+            "XGBRegressor",
+            XGBRegressor(
+                n_estimators=200,
+                learning_rate=0.05,
+                max_depth=4,
+                subsample=0.9,
+                colsample_bytree=0.9,
+                objective="reg:squarederror",
+                eval_metric="rmse",
+                random_state=random_state,
+                n_jobs=-1,
+                verbosity=0,
+            ),
+            scale_numeric=False,
+        ))
 
-    return models
+    return specs
 
 
-def format_xgboost_error(error: Exception) -> str:
-    """Make XGBoost import/runtime errors understandable in the results CSV."""
-    error_type = type(error).__name__
-    error_text = str(error)
-
-    if isinstance(error, ModuleNotFoundError):
+def _xgb_error(exc: Exception) -> str:
+    name, text = type(exc).__name__, str(exc)
+    if isinstance(exc, ModuleNotFoundError):
         return (
-            f"{error_type}: xgboost is not installed for this Python interpreter. "
-            "Run with the project virtual environment, for example `.venv/bin/python src/train_zenodo_baseline.py`."
+            f"{name}: xgboost is not installed. "
+            "Run with the project virtual environment: `.venv/bin/python src/train_zenodo_baseline.py`."
         )
-
-    if "libomp" in error_text or "OpenMP" in error_text:
+    if "libomp" in text or "OpenMP" in text:
         return (
-            f"{error_type}: native XGBoost library could not load because OpenMP/libomp is missing or not linked. "
-            "On macOS, run `brew install libomp` and `brew link --force libomp`."
+            f"{name}: OpenMP/libomp is missing or not linked. "
+            "On macOS run `brew install libomp && brew link --force libomp`."
         )
+    return f"{name}: {text}"
 
-    return f"{error_type}: {error_text}"
 
-
-def model_status_result(
-    model_name: str,
+def _skipped_result(
+    spec: ModelSpec,
     status: str,
-    message: str,
-    x_train: pd.DataFrame,
-    x_test: pd.DataFrame,
+    train_rows: int,
+    test_rows: int,
+    feature_count: int,
     dataset_name: str,
     target_column: str,
     cv_folds: int,
 ) -> dict[str, object]:
-    """Create an output row for a model that cannot run in this environment."""
     return {
         "run_timestamp": datetime.now().isoformat(timespec="seconds"),
         "dataset": dataset_name,
-        "model": model_name,
+        "model": spec.name,
         "target": target_column,
         "status": status,
-        "error_message": message,
-        "train_rows": len(x_train),
-        "test_rows": len(x_test),
-        "feature_count": x_train.shape[1],
-        "mae": None,
-        "rmse": None,
-        "r2_score": None,
+        "error_message": spec.skip_reason,
+        "train_rows": train_rows,
+        "test_rows": test_rows,
+        "feature_count": feature_count,
+        "mae": None, "rmse": None, "r2_score": None,
         "cv_folds": cv_folds,
-        "cv_mae_mean": None,
-        "cv_mae_std": None,
-        "cv_rmse_mean": None,
-        "cv_rmse_std": None,
-        "cv_r2_mean": None,
-        "cv_r2_std": None,
+        "cv_mae_mean": None, "cv_mae_std": None,
+        "cv_rmse_mean": None, "cv_rmse_std": None,
+        "cv_r2_mean": None, "cv_r2_std": None,
         "training_time_sec": None,
         "inference_time_sec": None,
         "inference_time_ms_per_row": None,
     }
 
 
+def _run_cv(
+    pipeline: Pipeline,
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    cv_folds: int,
+    random_state: int,
+) -> dict[str, object]:
+    if cv_folds <= 1:
+        return {"cv_folds": cv_folds, "cv_mae_mean": None, "cv_mae_std": None,
+                "cv_rmse_mean": None, "cv_rmse_std": None, "cv_r2_mean": None, "cv_r2_std": None}
+
+    if cv_folds > len(x_train):
+        raise ValueError(f"cv_folds ({cv_folds}) exceeds training rows ({len(x_train)}).")
+
+    cv = KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
+
+    # cross_val_score clones the pipeline per fold, so imputation and scaling are
+    # fitted only on each fold's training portion — no validation-fold leakage.
+    # Negative-metric convention: scikit-learn returns negated error scores so
+    # that higher is always better; negate again to get positive MAE/RMSE.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        cv_mae  = -cross_val_score(pipeline, x_train, y_train, cv=cv, scoring="neg_mean_absolute_error")
+        cv_rmse = -cross_val_score(pipeline, x_train, y_train, cv=cv, scoring="neg_root_mean_squared_error")
+        cv_r2   =  cross_val_score(pipeline, x_train, y_train, cv=cv, scoring="r2")
+
+    return {
+        "cv_folds": cv_folds,
+        "cv_mae_mean":  float(cv_mae.mean()),  "cv_mae_std":  float(cv_mae.std()),
+        "cv_rmse_mean": float(cv_rmse.mean()), "cv_rmse_std": float(cv_rmse.std()),
+        "cv_r2_mean":   float(cv_r2.mean()),   "cv_r2_std":   float(cv_r2.std()),
+    }
+
+
 def evaluate_model(
-    model_name: str,
-    model: object,
+    spec: ModelSpec,
     preprocessor: ColumnTransformer,
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
@@ -235,109 +228,39 @@ def evaluate_model(
     cv_folds: int,
     random_state: int,
 ) -> dict[str, object]:
-    """Train one model and return regression metrics for the selected target."""
-    # The pipeline ensures preprocessing learned on the training split is reused
-    # consistently on the test split. A fresh preprocessor clone is passed into
-    # this function for each model, so fitted transformer state is never shared
-    # between estimators.
-    pipeline = Pipeline(
-        steps=[
-            ("preprocess", preprocessor),
-            ("model", model),
-        ]
-    )
+    pipeline = Pipeline(steps=[("preprocess", preprocessor), ("model", spec.model)])
 
-    # Cross-validation is run on the training split only. This gives a more
-    # stable estimate than one train/test split while keeping the final holdout
-    # test set untouched for the reported test metrics below.
-    cv_results: dict[str, object] = {
-        "cv_folds": cv_folds,
-        "cv_mae_mean": None,
-        "cv_mae_std": None,
-        "cv_rmse_mean": None,
-        "cv_rmse_std": None,
-        "cv_r2_mean": None,
-        "cv_r2_std": None,
-    }
-    if cv_folds > 1:
-        if cv_folds > len(x_train):
-            raise ValueError(
-                f"cv_folds ({cv_folds}) cannot be greater than the number of training rows ({len(x_train)})."
-            )
-
-        cv = KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
-
-        # cross_val_score clones the whole pipeline for each fold. This means
-        # imputation, encoding, and optional scaling are fitted only on the
-        # training portion of that fold, which avoids validation-fold leakage.
-        #
-        # scikit-learn returns negative values for error metrics because higher
-        # scores are considered better. Convert them back to positive errors for
-        # easier interpretation in the CSV output.
-        # Some Python/numpy/scikit-learn combinations emit RuntimeWarnings for
-        # numerically unstable LinearRegression matrix multiplication even when
-        # the final metrics are finite. Suppress those warnings here and record
-        # actual failures through exceptions/results instead of noisy console
-        # output.
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-            cv_mae = -cross_val_score(pipeline, x_train, y_train, cv=cv, scoring="neg_mean_absolute_error")
-            cv_rmse = -cross_val_score(
-                pipeline,
-                x_train,
-                y_train,
-                cv=cv,
-                scoring="neg_root_mean_squared_error",
-            )
-            cv_r2 = cross_val_score(pipeline, x_train, y_train, cv=cv, scoring="r2")
-
-        cv_results.update(
-            {
-                "cv_mae_mean": float(cv_mae.mean()),
-                "cv_mae_std": float(cv_mae.std()),
-                "cv_rmse_mean": float(cv_rmse.mean()),
-                "cv_rmse_std": float(cv_rmse.std()),
-                "cv_r2_mean": float(cv_r2.mean()),
-                "cv_r2_std": float(cv_r2.std()),
-            }
-        )
+    cv_results = _run_cv(pipeline, x_train, y_train, cv_folds, random_state)
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-        train_start = perf_counter()
+        t0 = perf_counter()
         pipeline.fit(x_train, y_train)
-        training_time_sec = perf_counter() - train_start
+        training_time_sec = perf_counter() - t0
 
-        inference_start = perf_counter()
+        t1 = perf_counter()
         predictions = pipeline.predict(x_test)
-        inference_time_sec = perf_counter() - inference_start
+        inference_time_sec = perf_counter() - t1
 
     if not np.isfinite(predictions).all():
         raise ValueError("Model produced non-finite predictions.")
 
-    # MAE/RMSE show error in target units. R2 shows how much variance the model
-    # explains compared with predicting the mean.
-    mae = mean_absolute_error(y_test, predictions)
-    rmse = float(np.sqrt(mean_squared_error(y_test, predictions)))
-    r2 = r2_score(y_test, predictions)
-
     return {
         "run_timestamp": datetime.now().isoformat(timespec="seconds"),
         "dataset": dataset_name,
-        "model": model_name,
+        "model": spec.name,
         "target": target_column,
         "status": "ok",
         "error_message": "",
         "train_rows": len(x_train),
         "test_rows": len(x_test),
         "feature_count": x_train.shape[1],
-        "mae": mae,
-        "rmse": rmse,
-        "r2_score": r2,
+        "mae":      mean_absolute_error(y_test, predictions),
+        "rmse":     float(np.sqrt(mean_squared_error(y_test, predictions))),
+        "r2_score": r2_score(y_test, predictions),
         **cv_results,
-        "training_time_sec": training_time_sec,
-        "inference_time_sec": inference_time_sec,
+        "training_time_sec":       training_time_sec,
+        "inference_time_sec":      inference_time_sec,
         "inference_time_ms_per_row": inference_time_sec / len(x_test) * 1000,
     }
 
@@ -352,74 +275,48 @@ def train_baselines(
     drop_columns: list[str],
     cv_folds: int,
 ) -> pd.DataFrame:
-    """Train baseline models, then save holdout and cross-validation metrics."""
     data = load_dataset(input_path, target_column)
     features, target = split_features_and_target(data, target_column, drop_columns)
 
-    # Use a fixed random_state so baseline results are repeatable in reports.
     x_train, x_test, y_train, y_test = train_test_split(
-        features,
-        target,
-        test_size=test_size,
-        random_state=random_state,
+        features, target, test_size=test_size, random_state=random_state,
     )
 
-    # Build two unfitted preprocessing templates:
-    # - scaled: for Linear Regression
-    # - unscaled: for tree/boosting models where scaling is unnecessary
-    scaled_preprocessor = build_preprocessor(features, scale_numeric=True)
-    unscaled_preprocessor = build_preprocessor(features, scale_numeric=False)
+    preprocessors = {
+        True:  build_preprocessor(features, scale_numeric=True),
+        False: build_preprocessor(features, scale_numeric=False),
+    }
+
     results = []
-    for model_name, model, skip_reason, scale_numeric in build_model_specs(random_state):
-        if model is None:
-            results.append(
-                model_status_result(
-                    model_name=model_name,
-                    status="skipped",
-                    message=skip_reason,
-                    x_train=x_train,
-                    x_test=x_test,
-                    dataset_name=dataset_name,
-                    target_column=target_column,
-                    cv_folds=cv_folds,
-                )
-            )
+    for spec in build_model_specs(random_state):
+        skipped_kwargs = dict(
+            spec=spec,
+            train_rows=len(x_train),
+            test_rows=len(x_test),
+            feature_count=x_train.shape[1],
+            dataset_name=dataset_name,
+            target_column=target_column,
+            cv_folds=cv_folds,
+        )
+
+        if spec.model is None:
+            results.append(_skipped_result(status="skipped", **skipped_kwargs))
             continue
 
         try:
-            # clone(...) is important because Pipeline.fit mutates the
-            # preprocessor in place. Without cloning, later models could reuse
-            # fitted state from earlier model runs.
-            results.append(
-                evaluate_model(
-                    model_name=model_name,
-                    model=model,
-                    # Each model receives a fresh clone so no fitted state is
-                    # shared across model runs.
-                    preprocessor=clone(scaled_preprocessor if scale_numeric else unscaled_preprocessor),
-                    x_train=x_train,
-                    x_test=x_test,
-                    y_train=y_train,
-                    y_test=y_test,
-                    dataset_name=dataset_name,
-                    target_column=target_column,
-                    cv_folds=cv_folds,
-                    random_state=random_state,
-                )
-            )
-        except Exception as error:
-            results.append(
-                model_status_result(
-                    model_name=model_name,
-                    status="failed",
-                    message=f"{type(error).__name__}: {error}",
-                    x_train=x_train,
-                    x_test=x_test,
-                    dataset_name=dataset_name,
-                    target_column=target_column,
-                    cv_folds=cv_folds,
-                )
-            )
+            results.append(evaluate_model(
+                spec=spec,
+                preprocessor=clone(preprocessors[spec.scale_numeric]),
+                x_train=x_train, x_test=x_test,
+                y_train=y_train, y_test=y_test,
+                dataset_name=dataset_name,
+                target_column=target_column,
+                cv_folds=cv_folds,
+                random_state=random_state,
+            ))
+        except Exception as exc:
+            spec = spec._replace(skip_reason=f"{type(exc).__name__}: {exc}")
+            results.append(_skipped_result(status="failed", **skipped_kwargs))
 
     results_df = pd.DataFrame(results)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -428,7 +325,6 @@ def train_baselines(
 
 
 def parse_args() -> argparse.Namespace:
-    """Read command-line options for baseline training."""
     parser = argparse.ArgumentParser(
         description="Train baseline regression models for QoS prediction."
     )
@@ -439,23 +335,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-size", type=float, default=0.20)
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument(
-        "--cv-folds",
-        type=int,
-        default=5,
-        help="Number of k-fold cross-validation folds to run on the training split. Use 0 or 1 to disable.",
+        "--cv-folds", type=int, default=5,
+        help="K-fold CV folds on the training split. Use 0 or 1 to disable.",
     )
     parser.add_argument(
-        "--drop-column",
-        action="append",
-        default=[],
-        help="Extra input column to exclude from model training. Can be used more than once.",
+        "--drop-column", action="append", default=[],
+        help="Input column to exclude from training. Repeatable.",
     )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    metric_results = train_baselines(
+    results = train_baselines(
         input_path=args.input_path,
         output_path=args.output_path,
         target_column=args.target_column,
@@ -465,6 +357,5 @@ if __name__ == "__main__":
         drop_columns=DEFAULT_DROP_COLUMNS + args.drop_column,
         cv_folds=args.cv_folds,
     )
-
     print(f"Model results written to: {args.output_path}")
-    print(metric_results.to_string(index=False))
+    print(results.to_string(index=False))
