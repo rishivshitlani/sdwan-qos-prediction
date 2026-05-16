@@ -73,9 +73,13 @@ DRR_PROFILES = [
     "65,25,10",
 ]
 
-# Traffic intensity range (bits/time-unit, same as ch20)
-MAX_AVG_LAMBDA = 2000
-MIN_AVG_LAMBDA = 400
+# Traffic intensity range (bits/time-unit).
+# Raised from ch20 defaults (400-2000) to create meaningful congestion so that
+# QoS scheduling weights (Gold=60%, Bronze=10%) produce visible delay/loss differences.
+# At 2000 bit/tu the network is ~14% utilised and all queues are empty — no differentiation.
+# At 10000 bit/tu small topologies (6-8 nodes) reach 50-80% utilisation where scheduling matters.
+MAX_AVG_LAMBDA = 10_000
+MIN_AVG_LAMBDA = 2_000
 
 # ToS probability distributions per scenario (matches original ch20)
 TOS_PROBS_SKEWED = [0.10, 0.30, 0.60]   # Scenarios A/B/C: 10% Gold, 30% Silver, 60% Bronze
