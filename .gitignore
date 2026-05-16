@@ -31,6 +31,8 @@ reports/*
 !reports/model_results/
 reports/model_results/*
 !reports/model_results/*.csv
+reports/model_results/model_results.csv
+reports/model_results/zenodo_baseline_recommended_bandwidth_results.csv
 documents/
 !documents/
 documents/*
@@ -38,6 +40,7 @@ documents/*
 !documents/model_explanation.md
 .DS_Store
 WORKLOG.ipynb
+CLAUDE.md
 
 # LaTeX build artifacts
 *.aux
