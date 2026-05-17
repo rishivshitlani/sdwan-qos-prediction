@@ -41,6 +41,10 @@ DEFAULT_DROP_COLUMNS = [
     "packet_loss_percent",
     "actual_throughput_mbps",
     "source_file",
+    "protocol",
+    "application_type",
+    "link_type",
+    "sdr",
 ]
 
 
