@@ -1,7 +1,7 @@
 """Train baseline regression models for SD-WAN QoS prediction.
 
 Loads a project-style CSV, trains DummyRegressor, Linear Regression, SVR,
-Random Forest, and XGBoost, then writes holdout and k-fold cross-validation
+Random Forest, and XGBoost, then appends holdout and k-fold cross-validation
 metrics plus feature-importance output to reports/model_results/.
 """
 
@@ -319,6 +319,18 @@ def feature_importance_output_path(output_path: Path) -> Path:
     return output_path.with_name(f"{output_path.stem}_feature_importance{output_path.suffix}")
 
 
+def append_results_csv(rows: pd.DataFrame, output_path: Path) -> None:
+    """Append result rows to a CSV, writing the header only for a new file."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    append_to_existing = output_path.exists() and output_path.stat().st_size > 0
+    rows.to_csv(
+        output_path,
+        mode="a" if append_to_existing else "w",
+        header=not append_to_existing,
+        index=False,
+    )
+
+
 def train_baselines(
     input_path: Path,
     output_path: Path,
@@ -381,9 +393,9 @@ def train_baselines(
             )
 
     results_df = pd.DataFrame(results)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    results_df.to_csv(output_path, index=False)
-    pd.DataFrame(feature_importance_rows).to_csv(feature_importance_output_path(output_path), index=False)
+    append_results_csv(results_df, output_path)
+    if feature_importance_rows:
+        append_results_csv(pd.DataFrame(feature_importance_rows), feature_importance_output_path(output_path))
     return results_df
 
 

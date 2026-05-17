@@ -426,7 +426,13 @@ def train_bnnupc_mlp(
     ])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    results_df.to_csv(output_path, index=False)
+    append_to_existing = output_path.exists() and output_path.stat().st_size > 0
+    results_df.to_csv(
+        output_path,
+        mode="a" if append_to_existing else "w",
+        header=not append_to_existing,
+        index=False,
+    )
     return results_df
 
 
