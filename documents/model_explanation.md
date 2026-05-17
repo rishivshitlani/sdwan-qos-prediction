@@ -6,7 +6,7 @@ This document explains the machine learning models used in this project, the inp
 
 ## 1. What the Models Are Predicting
 
-### Output (Target Variable)
+### Zenodo Output (Target Variable)
 
 All models in the Zenodo experiment are trained to predict one value:
 
@@ -17,6 +17,17 @@ All models in the Zenodo experiment are trained to predict one value:
 This is a **supervised regression** task — the model is given a set of network and radio configuration inputs and must output a continuous numeric prediction of how much throughput will actually be delivered.
 
 A secondary derived target (`recommended_bandwidth_percent`) is also available. It is computed as `actual_throughput_mbps / offered_throughput_mbps × 100`. It is not used as the primary target because it is derived from the actual throughput — training on it while including `actual_throughput_mbps` as an input would give the model the answer indirectly (target leakage).
+
+### BNN-UPC Output (Target Variable)
+
+The BNN-UPC experiment predicts per-flow delay from topology, traffic, and QoS scheduling features.
+
+| Target column | Unit / scale | Description |
+| --- | --- | --- |
+| `avg_delay` | simulator delay unit | Mean per-flow delay from BNNetSimulator |
+| `log_avg_delay` | log-transformed delay | Main BNN-UPC modelling target, used to reduce the effect of the heavy-tailed raw delay distribution |
+
+The current BNN-UPC baseline and neural-network experiments use `log_avg_delay` as the target. Raw delay is still retained in the processed dataset for analysis, but it is dropped from model inputs when predicting `log_avg_delay`.
 
 ---
 
@@ -54,6 +65,37 @@ After loading the processed Zenodo dataset, the following columns are used as mo
 | `testbed` | ntnu, wue | Which of the two 5G testbeds the measurement came from |
 
 > **Note:** `protocol`, `application_type`, `link_type`, and `sdr` are constant across all Zenodo rows. They carry zero variance and contribute nothing to predictions. Feature importance analysis confirms their importance scores are 0.0. They will be dropped in future experiments.
+
+### BNN-UPC Features
+
+The BNN-UPC processed dataset is generated from BNNetSimulator archives. Each row represents one non-self source-destination flow from one simulation sample.
+
+The leakage-safe feature set used by XGBoost and the PyTorch MLP contains 11 raw columns:
+
+| Feature | Type | Description |
+| --- | --- | --- |
+| `tos` | numeric | BNNetSimulator traffic class identifier: 0=Gold, 1=Silver, 2=Bronze |
+| `qos_class` | categorical | Human-readable QoS class derived from `tos` |
+| `offered_bandwidth` | numeric | Offered traffic load for the flow |
+| `time_distribution` | numeric | Traffic generation distribution code from the traffic matrix |
+| `routing_hops` | numeric | Number of hops on the source-destination route |
+| `n_nodes` | numeric | Number of nodes in the topology |
+| `max_avg_lambda` | numeric | Maximum traffic intensity used for the simulation sample |
+| `link_bandwidth` | numeric | Link capacity used by the generated topology |
+| `scheduling_policy` | categorical | Dominant scheduling policy on the flow path (`WFQ`, `DRR`, or `SP`) |
+| `tos_queue_weight` | numeric | Average queue weight for the flow's ToS along the path |
+| `min_tos_weight` | numeric | Minimum queue weight for the flow's ToS along the path |
+
+The following columns are excluded from BNN-UPC model inputs:
+
+```text
+simulation_id, scenario,
+avg_delay, jitter, packet_loss_rate,
+delay_p10, delay_p50, delay_p90,
+actual_bandwidth
+```
+
+The first two are identifiers or experiment labels. The remaining columns are measured outcomes, so using them as inputs would leak information about the target.
 
 ---
 
@@ -254,6 +296,39 @@ XGBoost uses gain-based importance: how much each feature reduces the loss funct
 
 ---
 
+### 3.6 PyTorch Feedforward MLP
+
+**What it does:**
+The PyTorch MLP is a fully connected neural network for tabular QoS prediction. It receives the same encoded BNN-UPC features as the XGBoost log-delay baseline and predicts `log_avg_delay`.
+
+**Architecture used:**
+
+```text
+input_dim -> 128 -> 64 -> 32 -> 1
+```
+
+Each hidden layer uses ReLU activation and dropout. The model is trained with AdamW and mean squared error loss. Early stopping monitors a validation split taken from the training data, and the final holdout test set is evaluated only after training.
+
+**Preprocessing:**
+Numeric features are median-imputed and scaled with `StandardScaler`. Categorical features are most-frequent-imputed and one-hot encoded. The 11 raw BNN-UPC features become 15 encoded features after preprocessing.
+
+**Why it is included:**
+The MLP is the first deep-learning baseline in the project. It tests whether a simple neural network can match or improve on tree-based models for the tabular BNN-UPC QoS prediction task before moving to more complex sequence or graph neural models.
+
+**Results on BNN-UPC `log_avg_delay`:**
+
+| Metric | Value |
+| --- | ---: |
+| MAE | 0.185 |
+| RMSE | 0.357 |
+| R² | 0.766 |
+| CV R² (mean ± std) | 0.769 ± 0.008 |
+| Inference time | 0.00019 ms/row |
+
+The MLP is currently competitive with XGBoost on the BNN-UPC log-delay target. Its CV R² is slightly higher than the XGBoost run, though the difference is small enough that both should be treated as comparable baselines rather than a decisive win.
+
+---
+
 ## 4. Evaluation Metrics
 
 ### 4.1 MAE — Mean Absolute Error
@@ -335,6 +410,8 @@ The standard deviation across the 5 folds. A small std (e.g., 0.019 for Linear R
 
 ## 5. Full Results Comparison
 
+### Zenodo Throughput Results
+
 | Model | MAE (Mbps) | RMSE (Mbps) | R² | CV R² | CV R² std | Inference (ms/row) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | DummyRegressor (mean) | 36.90 | 43.88 | -0.007 | -0.011 | 0.006 | 0.011 |
@@ -349,3 +426,31 @@ The standard deviation across the 5 folds. A small std (e.g., 0.019 for Linear R
 - SVR performs significantly better than Linear Regression, confirming non-linear relationships in the data
 - All four real models comfortably beat the DummyRegressor, confirming that the input features contain meaningful signal for predicting throughput
 - CV R² is the primary metric for thesis reporting given the small dataset size (604 rows)
+
+### BNN-UPC Log-Delay Results
+
+| Model | MAE | RMSE | R² | CV R² | CV R² std | Inference (ms/row) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| DummyRegressor (mean) | 0.538 | 0.740 | -0.001 | -0.000 | 0.000 | 0.00043 |
+| Linear Regression | 0.227 | 0.415 | 0.685 | 0.690 | 0.014 | 0.00046 |
+| SVR (RBF kernel) | **0.174** | 0.391 | 0.721 | 0.721 | 0.013 | 0.246 |
+| Random Forest | 0.181 | 0.364 | 0.758 | 0.764 | 0.010 | 0.00703 |
+| XGBoost | 0.185 | 0.359 | 0.765 | 0.766 | 0.008 | 0.00058 |
+| PyTorch MLP | 0.185 | **0.357** | **0.766** | **0.769** | 0.008 | **0.00019** |
+
+**Key observations:**
+- The log transform materially improves model fit compared with raw `avg_delay`, because BNN-UPC delay is heavy-tailed under congestion.
+- Routing and topology features are strong predictors. The BNN-UPC feature-importance files show `routing_hops`, queue weights, topology size, and ToS-related features among the strongest signals.
+- The PyTorch MLP, XGBoost, and Random Forest are close on CV R². This suggests the current tabular feature representation is already informative, and future gains may require richer topology or temporal modelling rather than only larger tabular models.
+
+## 6. Report File Behaviour
+
+Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This applies to:
+
+```text
+src/train_baseline.py
+src/train_zenodo_baseline.py
+src/train_bnnupc_mlp.py
+```
+
+This means repeated runs preserve experiment history in the same report file. The `run_timestamp`, `dataset`, `model`, and `target` columns identify each run.

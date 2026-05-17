@@ -63,6 +63,26 @@ Some models require numeric labels. Use this encoding only after preserving the 
 
 The numeric values represent priority order. They should not be interpreted as measured bandwidth percentages or as ground-truth QoS outcomes.
 
+## BNN-UPC ToS Mapping
+
+The BNN-UPC simulation workflow uses BNNetSimulator's `ToS` field to encode the same three QoS classes:
+
+| BNNetSimulator ToS | QoS class | Priority | Scenario A queue weight |
+| ---: | --- | --- | ---: |
+| 0 | Gold | Highest | 60% |
+| 1 | Silver | Medium | 30% |
+| 2 | Bronze | Lowest | 10% |
+
+This mapping is used by:
+
+```text
+src/generate_bnnupc_dataset.py
+src/process_bnnupc_dataset.py
+src/train_bnnupc_mlp.py
+```
+
+In the processed BNN-UPC dataset, both `tos` and `qos_class` are retained. Keeping both columns makes the numeric simulator encoding traceable while preserving the human-readable QoS label for analysis and one-hot model features.
+
 ## Relationship to Option 2 Targets
 
 For the Option 2 research direction, QoS classes can be used as constraints or weights in an optimisation-based target. For example, a target can be derived by assigning higher penalty weights to Gold traffic SLA violations than to Silver or Bronze violations.
