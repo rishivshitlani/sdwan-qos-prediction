@@ -60,6 +60,18 @@ python src/process_bnnupc_dataset.py
 Output: `data/processed/bnnupc_qos_dataset.csv`
 One row per src-dst flow, with `qos_class` column (Gold/Silver/Bronze).
 
+### Step 4 — Train PyTorch MLP on log delay
+
+```bash
+python src/train_bnnupc_mlp.py
+```
+
+The MLP uses the same leakage-safe feature set as the XGBoost log-delay
+baseline: identifiers and delay/loss outcome columns are dropped, and the
+target is `log_avg_delay`.
+
+Output: `reports/model_results/bnnupc_mlp_log_delay_results.csv`
+
 ## References
 
 - BNNetSimulator: https://github.com/BNN-UPC/BNNetSimulator

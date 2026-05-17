@@ -4,6 +4,7 @@ scikit-learn
 matplotlib
 seaborn
 xgboost
+torch
 jupyter
 joblib
 scapy
