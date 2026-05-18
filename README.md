@@ -49,7 +49,8 @@ sdwan-qos-prediction/
 │   ├── generate_bnnupc_dataset.py
 │   ├── process_bnnupc_dataset.py
 │   ├── train_baseline.py
-│   └── train_bnnupc_mlp.py
+│   ├── train_bnnupc_mlp.py
+│   └── recommend_qos_allocation.py
 |
 ├── notebooks/
 ├── documents/
@@ -318,6 +319,40 @@ reports/model_results/bnnupc_mlp_log_delay_results.csv
 
 Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This keeps repeated experiments in one report file.
 
+### Recommend Layer 3 QoS Bandwidth Allocation
+
+The allocation recommender uses the trained BNN-UPC log-delay relationship to test candidate WFQ weight profiles and recommend how bandwidth should be split across Gold, Silver, and Bronze traffic:
+
+```bash
+.venv/bin/python src/recommend_qos_allocation.py
+```
+
+Default candidate profiles:
+
+```text
+60/30/10
+50/40/10
+33/33/34
+25/65/10
+80/15/5
+```
+
+Default SLA thresholds:
+
+```text
+Gold < 20 ms
+Silver < 50 ms
+Bronze < 100 ms
+```
+
+The script trains an XGBoost `log_avg_delay` model, rewrites the candidate WFQ class weights into the traffic pattern, predicts class-level delay, and ranks profiles by SLA feasibility and weighted violation score.
+
+Output:
+
+```text
+reports/model_results/bnnupc_qos_allocation_recommendations.csv
+```
+
 ## Current CICIDS2017 Findings
 
 The current raw dataset is:
@@ -567,6 +602,10 @@ The current BNN-UPC target is `log_avg_delay`. The log transform is used because
 | PyTorch MLP | 0.1854 | 0.3574 | 0.7665 | 0.7695 |
 
 The MLP is a simple feedforward network with three hidden layers (`128,64,32`), ReLU activations, dropout, AdamW, and early stopping. It is currently competitive with XGBoost on this tabular log-delay task.
+
+### Current Layer 3 Allocation Result
+
+Using the default SLA thresholds (`20/50/100 ms`) and default candidate profiles, the current recommender ranks `60/30/10` highest. No tested profile fully satisfies the Gold SLA threshold because predicted Gold mean delay remains around 24-25 ms. This is still useful: it shows the recommender can identify when a traffic pattern cannot meet the SLA with the available candidate profiles, then select the least-violating allocation.
 
 ## Notes on Data
 

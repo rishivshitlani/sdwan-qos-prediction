@@ -443,7 +443,46 @@ The standard deviation across the 5 folds. A small std (e.g., 0.019 for Linear R
 - Routing and topology features are strong predictors. The BNN-UPC feature-importance files show `routing_hops`, queue weights, topology size, and ToS-related features among the strongest signals.
 - The PyTorch MLP, XGBoost, and Random Forest are close on CV R². This suggests the current tabular feature representation is already informative, and future gains may require richer topology or temporal modelling rather than only larger tabular models.
 
-## 6. Report File Behaviour
+## 6. Layer 3 Allocation Recommender
+
+The Layer 3 recommender moves the project from passive QoS prediction to an SD-WAN decision-support task: choosing how bandwidth should be allocated across QoS classes.
+
+The implementation is in:
+
+```text
+src/recommend_qos_allocation.py
+```
+
+The workflow is:
+
+1. Train an XGBoost model on BNN-UPC `log_avg_delay` using the leakage-safe feature set.
+2. Take a traffic pattern from the processed BNN-UPC feature table, or from a user-supplied CSV with the same feature columns.
+3. Evaluate candidate WFQ profiles such as `60/30/10`, `50/40/10`, `33/33/34`, `25/65/10`, and `80/15/5`.
+4. For each profile, rewrite `scheduling_policy`, `tos_queue_weight`, and `min_tos_weight` to represent that allocation.
+5. Predict Gold, Silver, and Bronze delay.
+6. Rank profiles by SLA feasibility and weighted violation score.
+
+Default SLA thresholds are:
+
+| QoS class | SLA threshold |
+| --- | ---: |
+| Gold | 20 ms |
+| Silver | 50 ms |
+| Bronze | 100 ms |
+
+Current result:
+
+| Rank | Profile | SLA feasible | Gold mean delay | Silver mean delay | Bronze mean delay |
+| ---: | --- | --- | ---: | ---: | ---: |
+| 1 | 60/30/10 | No | 24.47 ms | 24.22 ms | 30.81 ms |
+| 2 | 80/15/5 | No | 24.99 ms | 30.62 ms | 31.27 ms |
+| 3 | 25/65/10 | No | 25.02 ms | 24.28 ms | 30.81 ms |
+| 4 | 33/33/34 | No | 25.12 ms | 24.55 ms | 33.92 ms |
+| 5 | 50/40/10 | No | 25.27 ms | 24.80 ms | 30.81 ms |
+
+No tested profile fully satisfies the Gold SLA threshold under the default traffic pattern and `20/50/100 ms` thresholds. The recommender therefore selects `60/30/10` as the least-violating allocation. This is still useful for the thesis because it shows both positive recommendations and SLA infeasibility detection.
+
+## 7. Report File Behaviour
 
 Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This applies to:
 
