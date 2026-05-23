@@ -497,7 +497,32 @@ By dominant scheduling policy:
 
 RMSLE is reported alongside MAE and RMSE because `avg_delay` spans from small queueing delays to very large delay spikes. RMSLE compares relative error on the delay scale, so it is less dominated by extreme Bronze delay values than ordinary RMSE.
 
-### 6.4 SLA Violation Precision
+### 6.4 Additional QoS Metrics: Jitter and P90 Delay
+
+The project now also evaluates XGBoost on `jitter` and `delay_p90` using the same leakage-safe BNN-UPC feature set. This addresses the point that each QoS metric needs its own evaluation instead of relying on one global CV R² for `avg_delay`.
+
+The evaluator is:
+
+```text
+src/evaluate_bnnupc_metric_slices.py
+```
+
+It reports overall, per-class, scenario, and scheduling-policy slices. Values are kept in the native simulator unit and also scaled to milliseconds for interpretation. Because both targets are non-negative and heavy-tailed, the report includes MAE, RMSE, R², and RMSLE.
+
+Current XGBoost per-class results:
+
+| Target | QoS class | MAE | RMSE | RMSLE | R² |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `jitter` | Gold | 0.54 ms | 2.31 ms | 0.369 | -9.201 |
+| `jitter` | Silver | 1.01 ms | 4.25 ms | 0.474 | -15.670 |
+| `jitter` | Bronze | 4.89 ms | 27.76 ms | 0.995 | 0.035 |
+| `delay_p90` | Gold | 8.30 ms | 17.68 ms | 0.252 | 0.611 |
+| `delay_p90` | Silver | 10.06 ms | 19.50 ms | 0.305 | 0.566 |
+| `delay_p90` | Bronze | 47.32 ms | 127.79 ms | 0.617 | 0.340 |
+
+The `delay_p90` target is meaningfully learnable, especially for Gold and Silver. The `jitter` target is harder to judge with R² because Gold and Silver jitter values are very small and have low variance. For jitter, MAE/RMSE in milliseconds and RMSLE are more useful than a single global R².
+
+### 6.5 SLA Violation Precision
 
 For operational SD-WAN use, the model can be converted into a binary trigger:
 

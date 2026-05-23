@@ -353,6 +353,39 @@ Additional models can be evaluated with repeated `--model` flags:
   --model XGBRegressor
 ```
 
+### Evaluate Additional BNN-UPC QoS Metrics
+
+Manzoor's feedback was that each QoS metric should be evaluated with its own
+class-aware metrics, not only one global CV R². The additional metric evaluator
+currently runs XGBoost on `jitter` and `delay_p90`:
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_metric_slices.py
+```
+
+Output:
+
+```text
+reports/model_results/bnnupc_metric_slice_evaluation.csv
+```
+
+The report is appended on each run and includes overall, per-class, scenario,
+and scheduling-policy slices. It reports MAE/RMSE in the native target unit,
+MAE/RMSE/RMSLE after scaling to milliseconds, and R² for each target.
+
+Current XGBoost per-class results show that `delay_p90` is learnable for Gold
+and Silver, while `jitter` is harder to evaluate with R² because Gold and
+Silver jitter values are very small and low-variance:
+
+| Target | QoS class | MAE | RMSE | RMSLE | R² |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `jitter` | Gold | 0.54 ms | 2.31 ms | 0.369 | -9.201 |
+| `jitter` | Silver | 1.01 ms | 4.25 ms | 0.474 | -15.670 |
+| `jitter` | Bronze | 4.89 ms | 27.76 ms | 0.995 | 0.035 |
+| `delay_p90` | Gold | 8.30 ms | 17.68 ms | 0.252 | 0.611 |
+| `delay_p90` | Silver | 10.06 ms | 19.50 ms | 0.305 | 0.566 |
+| `delay_p90` | Bronze | 47.32 ms | 127.79 ms | 0.617 | 0.340 |
+
 ### Recommend Layer 3 QoS Bandwidth Allocation
 
 The allocation recommender uses the trained BNN-UPC log-delay relationship to test candidate WFQ weight profiles and recommend how bandwidth should be split across Gold, Silver, and Bronze traffic:
