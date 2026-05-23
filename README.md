@@ -50,6 +50,7 @@ sdwan-qos-prediction/
 │   ├── process_bnnupc_dataset.py
 │   ├── train_baseline.py
 │   ├── train_bnnupc_mlp.py
+│   ├── evaluate_bnnupc_qos_slices.py
 │   └── recommend_qos_allocation.py
 |
 ├── notebooks/
@@ -318,6 +319,39 @@ reports/model_results/bnnupc_mlp_log_delay_results.csv
 ```
 
 Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This keeps repeated experiments in one report file.
+
+### Evaluate BNN-UPC by QoS Class and Policy
+
+For QoS-aware evaluation, do not rely only on one global CV R² or MAE. The BNN-UPC evaluator creates out-of-fold predictions and slices errors by QoS class, scheduling scenario, and scheduling policy:
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_qos_slices.py
+```
+
+Outputs:
+
+```text
+reports/model_results/bnnupc_qos_slice_evaluation.csv
+reports/model_results/bnnupc_sla_violation_precision.csv
+```
+
+The default model is XGBoost on `log_avg_delay`. The evaluator reports per-class MAE/RMSE/RMSLE, scenario-specific R², policy-specific R², and SLA violation precision using default thresholds:
+
+```text
+Gold > 30 ms
+Silver > 50 ms
+Bronze > 100 ms
+```
+
+Additional models can be evaluated with repeated `--model` flags:
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_qos_slices.py \
+  --model LinearRegression \
+  --model SVR_rbf \
+  --model RandomForestRegressor \
+  --model XGBRegressor
+```
 
 ### Recommend Layer 3 QoS Bandwidth Allocation
 
@@ -602,6 +636,37 @@ The current BNN-UPC target is `log_avg_delay`. The log transform is used because
 | PyTorch MLP | 0.1854 | 0.3574 | 0.7665 | 0.7695 |
 
 The MLP is a simple feedforward network with three hidden layers (`128,64,32`), ReLU activations, dropout, AdamW, and early stopping. It is currently competitive with XGBoost on this tabular log-delay task.
+
+### Current BNN-UPC QoS-Aware Evaluation
+
+Using out-of-fold XGBoost predictions, global delay MAE is `12.63 ms`, but the class-level view is very different:
+
+| QoS class | Rows | MAE delay | RMSLE delay | R² on log delay |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 4,592 | 3.05 ms | 0.160 | 0.914 |
+| Silver | 8,991 | 3.48 ms | 0.168 | 0.908 |
+| Bronze | 15,697 | 20.68 ms | 0.451 | 0.704 |
+
+This confirms that Bronze is much harder to predict and should not be hidden inside a single pooled metric.
+
+Policy/scenario slicing also shows different difficulty levels:
+
+| Slice | MAE delay | R² on log delay |
+| --- | ---: | ---: |
+| A_wfq_fixed | 6.16 ms | 0.796 |
+| B_wfq_profiles | 12.01 ms | 0.758 |
+| C_mixed_policy | 21.32 ms | 0.743 |
+| D_mixed_equal | 9.95 ms | 0.779 |
+
+For SLA violation triggers, precision is strongest for Gold:
+
+| QoS class | SLA threshold | Precision | Recall | F1 |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 30 ms | 0.994 | 0.899 | 0.944 |
+| Silver | 50 ms | 0.823 | 0.639 | 0.720 |
+| Bronze | 100 ms | 0.726 | 0.368 | 0.489 |
+
+This means that when the model predicts a Gold SLA violation, it is almost always correct, which is useful for SD-WAN policy triggers.
 
 ### Current Layer 3 Allocation Result
 

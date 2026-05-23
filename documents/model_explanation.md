@@ -443,7 +443,87 @@ The standard deviation across the 5 folds. A small std (e.g., 0.019 for Linear R
 - Routing and topology features are strong predictors. The BNN-UPC feature-importance files show `routing_hops`, queue weights, topology size, and ToS-related features among the strongest signals.
 - The PyTorch MLP, XGBoost, and Random Forest are close on CV R². This suggests the current tabular feature representation is already informative, and future gains may require richer topology or temporal modelling rather than only larger tabular models.
 
-## 6. Layer 3 Allocation Recommender
+## 6. QoS-Aware Evaluation
+
+The BNN-UPC dataset contains different QoS classes and scheduling policies, so a single global metric is not enough. Gold, Silver, and Bronze flows have different queue priorities and very different delay distributions. Bronze has the heaviest tail and can dominate pooled error metrics.
+
+The QoS-aware evaluator is:
+
+```text
+src/evaluate_bnnupc_qos_slices.py
+```
+
+It uses out-of-fold predictions and reports:
+
+- Per-class MAE/RMSE/RMSLE for Gold, Silver, and Bronze.
+- Scenario-specific R² for `A_wfq_fixed`, `B_wfq_profiles`, `C_mixed_policy`, and `D_mixed_equal`.
+- Scheduling-policy-specific R² for `WFQ`, `SP`, and `DRR`.
+- SLA violation precision, recall, and F1 for operational trigger thresholds.
+
+### 6.1 Per-Class Stratified Errors
+
+For XGBoost on `log_avg_delay`, the global MAE on the delay scale is `12.63 ms`. The per-class breakdown shows why this pooled value is incomplete:
+
+| QoS class | Rows | MAE delay | RMSLE delay | R² on log delay |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 4,592 | 3.05 ms | 0.160 | 0.914 |
+| Silver | 8,991 | 3.48 ms | 0.168 | 0.908 |
+| Bronze | 15,697 | 20.68 ms | 0.451 | 0.704 |
+
+Gold and Silver are predicted accurately, but Bronze has much higher absolute error and worse R² because its delay distribution is more volatile and heavy-tailed.
+
+### 6.2 Policy and Scenario Slicing
+
+The same XGBoost predictions show different performance by scheduling scenario:
+
+| Scenario | Rows | MAE delay | RMSLE delay | R² on log delay |
+| --- | ---: | ---: | ---: | ---: |
+| A_wfq_fixed | 6,560 | 6.16 ms | 0.257 | 0.796 |
+| B_wfq_profiles | 8,240 | 12.01 ms | 0.352 | 0.758 |
+| C_mixed_policy | 7,600 | 21.32 ms | 0.436 | 0.743 |
+| D_mixed_equal | 6,880 | 9.95 ms | 0.313 | 0.779 |
+
+The mixed policy scenario is the hardest. This is expected because it combines SP, WFQ, and DRR behaviour rather than a single fixed scheduler.
+
+By dominant scheduling policy:
+
+| Scheduling policy | Rows | MAE delay | RMSLE delay | R² on log delay |
+| --- | ---: | ---: | ---: | ---: |
+| DRR | 1,840 | 8.01 ms | 0.302 | 0.678 |
+| SP | 8,120 | 8.27 ms | 0.282 | 0.806 |
+| WFQ | 19,320 | 14.90 ms | 0.378 | 0.756 |
+
+### 6.3 RMSLE for Heavy-Tailed Delay
+
+RMSLE is reported alongside MAE and RMSE because `avg_delay` spans from small queueing delays to very large delay spikes. RMSLE compares relative error on the delay scale, so it is less dominated by extreme Bronze delay values than ordinary RMSE.
+
+### 6.4 SLA Violation Precision
+
+For operational SD-WAN use, the model can be converted into a binary trigger:
+
+```text
+Predicted delay > SLA threshold => likely SLA violation
+```
+
+Default thresholds:
+
+| QoS class | SLA threshold |
+| --- | ---: |
+| Gold | 30 ms |
+| Silver | 50 ms |
+| Bronze | 100 ms |
+
+XGBoost trigger performance:
+
+| QoS class | Actual violation rate | Precision | Recall | F1 |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 0.287 | 0.994 | 0.899 | 0.944 |
+| Silver | 0.075 | 0.823 | 0.639 | 0.720 |
+| Bronze | 0.066 | 0.726 | 0.368 | 0.489 |
+
+High Gold precision means that when the model says a Gold flow is likely to violate its SLA, the policy engine can trust the trigger. Bronze has lower recall, meaning many Bronze violations are still missed; this should be discussed as a limitation and possible future improvement.
+
+## 7. Layer 3 Allocation Recommender
 
 The Layer 3 recommender moves the project from passive QoS prediction to an SD-WAN decision-support task: choosing how bandwidth should be allocated across QoS classes.
 
@@ -482,7 +562,7 @@ Current result:
 
 No tested profile fully satisfies the Gold SLA threshold under the default traffic pattern and `20/50/100 ms` thresholds. The recommender therefore selects `60/30/10` as the least-violating allocation. This is still useful for the thesis because it shows both positive recommendations and SLA infeasibility detection.
 
-## 7. Report File Behaviour
+## 8. Report File Behaviour
 
 Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This applies to:
 
@@ -490,6 +570,7 @@ Training scripts append new timestamped rows to existing report CSVs instead of 
 src/train_baseline.py
 src/train_zenodo_baseline.py
 src/train_bnnupc_mlp.py
+src/evaluate_bnnupc_qos_slices.py
 ```
 
 This means repeated runs preserve experiment history in the same report file. The `run_timestamp`, `dataset`, `model`, and `target` columns identify each run.
