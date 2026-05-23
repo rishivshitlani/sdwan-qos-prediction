@@ -274,13 +274,20 @@ def evaluate_target(
     sla_ms: dict[str, float] | None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     features, target = split_features_and_target(data, target_column)
-    predictions = out_of_fold_predictions(
+
+    # Train on log scale so the model handles the heavy tail, then back-transform.
+    log_target = pd.Series(
+        np.log(np.clip(target.to_numpy(dtype=float), a_min=1e-9, a_max=None)),
+        index=target.index,
+    )
+    log_predictions = out_of_fold_predictions(
         features,
-        target,
+        log_target,
         model_name=model_name,
         cv_folds=cv_folds,
         random_state=random_state,
     )
+    predictions = np.exp(log_predictions)
 
     scored = data.loc[target.index, ["qos_class", "scenario", "scheduling_policy"]].copy()
     scored["true_target"] = target.to_numpy(dtype=float)
