@@ -41,6 +41,7 @@ documents/*
 .DS_Store
 WORKLOG.ipynb
 CLAUDE.md
+AGENTS.md
 
 # LaTeX build artifacts
 *.aux

@@ -102,9 +102,13 @@ Software-Defined Wide Area Networks (SD-WAN) are used to connect branch offices,
 
 This thesis investigates whether machine learning can predict QoS behaviour in SD-WAN-like environments and support proactive QoS decisions. The work uses two public-data-based experiments. The first experiment uses the Zenodo 5G campus network dataset to predict achieved throughput from radio and traffic configuration features. This acts as a link-capacity prediction baseline. The second experiment uses a locally generated BNN-UPC/BNNetSimulator dataset to study per-class QoS delay for Gold, Silver, and Bronze traffic under different scheduling policies.
 
-For the Zenodo dataset, XGBoost achieved the strongest throughput result among the tested models, with a cross-validated $R^2$ of approximately 0.756. The dataset is useful for link capacity prediction, but it does not contain QoS class variation. For the BNN-UPC dataset, XGBoost acts as the strongest explainable tree-based baseline, while the PyTorch feedforward neural network is the main neural-network path. Both models achieved similar performance on the log-transformed average delay target, with cross-validated $R^2$ values around 0.766--0.769.
+For the Zenodo dataset, Random Forest achieved the strongest throughput result among the tested models, with a cross-validated $R^2$ of approximately 0.94. XGBoost is close behind at 0.93. The dataset is useful for link capacity prediction, but it does not contain QoS class variation. For the BNN-UPC dataset, XGBoost acts as the strongest explainable tree-based baseline, while the PyTorch feedforward neural network is the main neural-network path. Both models achieved similar performance on the log-transformed average delay target, with cross-validated $R^2$ values around 0.766--0.769.
 
-The thesis also addresses a key evaluation issue: a single global metric can hide poor performance for one QoS class. Therefore, the BNN-UPC model is evaluated by QoS class, scheduling scenario, and scheduling policy. The results show that Gold and Silver delay are predicted much more accurately than Bronze delay. Finally, a Layer 3 allocation recommender is implemented. It tests candidate WFQ bandwidth profiles and recommends the least-violating Gold/Silver/Bronze allocation under SLA thresholds. The current recommender results are based on the trained delay model already evaluated in this thesis. The next planned enhancement is to compare allocation decisions from both XGBoost and the PyTorch MLP. This connects QoS prediction to the original SD-WAN decision question: how much bandwidth should be allocated to each QoS class?
+The thesis also addresses a key evaluation issue: a single global metric can hide poor performance for one QoS class. Therefore, the BNN-UPC model is evaluated by QoS class, scheduling scenario, and scheduling policy. The results show that Gold and Silver delay are predicted much more accurately than Bronze delay, with per-class $R^2$ values of 0.914, 0.908, and 0.704 respectively on a lightly loaded dataset.
+
+Beyond average delay, the evaluation is extended to two additional QoS targets: 90th-percentile delay (delay\_p90) and jitter. delay\_p90 shows moderate predictability for Gold and Silver ($R^2 \approx 0.64$--0.66), while jitter is found to be largely unpredictable from static network configuration features ($R^2 < 0.12$). This is a meaningful finding: jitter is driven by dynamic traffic burstiness that queue weights and scheduling policy alone cannot capture.
+
+A second, larger dataset (v2) is also generated under a more congested network regime. It contains 190,328 rows and introduces meaningful packet loss across all QoS classes (Gold 3.8\%, Silver 6.3\%, Bronze 14.8\%), enabling packet loss to be studied as a prediction target for the first time. Finally, a Layer 3 allocation recommender is implemented. It tests candidate WFQ bandwidth profiles and recommends the least-violating Gold/Silver/Bronze allocation under SLA thresholds. This connects QoS prediction to the original SD-WAN decision question: how much bandwidth should be allocated to each QoS class?
 	\end{abstracts}
 	
 	%%%% uncomment if needed
@@ -358,7 +362,20 @@ Four scheduling scenarios were generated:
     \item Mixed SP/WFQ/DRR policies with equal ToS distribution.
 \end{itemize}
 
-This dataset is used for the main QoS scheduling and allocation experiments.
+This dataset is referred to as the \textbf{v1 dataset} and is used for the main QoS scheduling and allocation experiments under a light-to-moderate load regime.
+
+\subsubsection{BNN-UPC v2: Congested Regime Dataset}
+
+A second dataset (v2) was generated to study network behaviour under near-saturation conditions and to introduce meaningful packet loss across all QoS classes. The v1 dataset had near-zero packet loss for Gold and Silver because the lightly loaded network never filled the queues.
+
+Three changes were made to the simulator configuration to create congestion:
+\begin{itemize}
+    \item Traffic intensity was raised from a maximum of 10,000 to 22,000 bits/time-unit, pushing link utilisation to 90\%+.
+    \item Buffer size was reduced from 32,000 to 8,000 bits per queue, so that burst traffic overflows queues even for high-priority classes.
+    \item Two additional bursty ON-OFF traffic patterns were added (average ON=3, OFF=12 and ON=2, OFF=8) to create packet clusters that overwhelm small buffers.
+\end{itemize}
+
+The v2 dataset contains 190,328 rows after filtering extreme simulation outliers (flows with average delay above 5 seconds, which represent fully saturated edge cases). The resulting loss distribution across QoS classes is: Gold 3.8\%, Silver 6.3\%, and Bronze 14.8\% mean loss rate. Delay is also more variable: Gold mean delay rises to 59 ms and Bronze to 192 ms, compared to 26 ms and 45 ms in v1. The v2 dataset is used as a complementary congestion experiment, not as a replacement for v1.
 
 \subsection{Datasets Not Used as Main Inputs}
 
@@ -416,6 +433,17 @@ Therefore, the BNN-UPC evaluation was extended using the following methods:
 \end{itemize}
 
 This evaluation better matches the SD-WAN use case. It shows not only whether the model is accurate overall, but also whether it is reliable for high-priority traffic.
+
+\subsection{Multi-Metric QoS Evaluation}
+
+Average delay is the primary QoS target, but real SD-WAN environments also care about tail delay and jitter. Therefore, the evaluation is extended to two additional targets:
+
+\begin{itemize}
+    \item \textbf{delay\_p90:} The 90th percentile of packet delay. It represents the worst-case experience for 10\% of packets, which is more relevant than mean delay for real-time applications.
+    \item \textbf{jitter:} Variation in packet delay. High jitter degrades voice and video quality even when mean delay is acceptable.
+\end{itemize}
+
+Both targets are heavy-tailed like average delay, so a log transformation is applied before training and predictions are back-transformed for reporting. MAE, RMSE, RMSLE, and $R^2$ are reported per QoS class for each target. This allows direct comparison of how predictable each metric is from the available network configuration features.
 
 \section{Layer 3 Allocation Recommender}
 
@@ -559,6 +587,25 @@ D\_mixed\_equal & 6,880 & 9.95 ms & 0.779 \\
 \end{tabular}
 \end{table}
 
+Table~\ref{tab:policy_results} shows results sliced by scheduling policy. Strict Priority (SP) achieves the best $R^2$ because SP flows follow a deterministic priority order that the model can learn well. WFQ is harder because queue weights vary across profiles and interact with traffic load in more complex ways.
+
+\begin{table}[H]
+\centering
+\caption{BNN-UPC Scheduling Policy Evaluation using XGBoost (v1 Dataset)}
+\label{tab:policy_results}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{Policy} & \textbf{Rows} & \textbf{MAE Delay} & \textbf{RMSLE} & \textbf{$R^2$ Log Delay} \\
+\hline
+SP (Strict Priority) & 8,120 & 8.27 ms & 0.282 & 0.806 \\
+\hline
+DRR (Deficit Round Robin) & 1,840 & 8.01 ms & 0.302 & 0.678 \\
+\hline
+WFQ (Weighted Fair Queueing) & 19,320 & 14.90 ms & 0.378 & 0.756 \\
+\hline
+\end{tabular}
+\end{table}
+
 \subsection{SLA Violation Precision}
 
 For SD-WAN use, exact delay prediction is not the only concern. The model should also identify when a flow is likely to violate an SLA. The continuous delay prediction was converted into a binary trigger using these thresholds: Gold $>$ 30 ms, Silver $>$ 50 ms, and Bronze $>$ 100 ms.
@@ -581,6 +628,108 @@ Bronze & 100 ms & 0.726 & 0.368 & 0.489 \\
 \end{table}
 
 The Gold precision is very high. This means that when the model predicts a Gold SLA violation, it is almost always correct. This is useful for SD-WAN policy triggers, because false positives could cause unnecessary routing changes. Bronze recall is lower, so many Bronze violations are still missed. This is a limitation of the current model.
+
+\section{Multi-Metric QoS Evaluation (v1 Dataset)}
+
+Beyond average delay, the BNN-UPC v1 dataset was used to evaluate delay\_p90 and jitter per QoS class. The same out-of-fold XGBoost pipeline was used for both targets, with a log transform applied before training.
+
+\subsection{delay\_p90 Results}
+
+Table~\ref{tab:p90_results} shows the per-class results for 90th-percentile delay prediction.
+
+\begin{table}[H]
+\centering
+\caption{Per-Class delay\_p90 Prediction Results using XGBoost (v1 Dataset)}
+\label{tab:p90_results}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{QoS Class} & \textbf{Rows} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$} \\
+\hline
+Gold & 4,592 & 6.64 ms & 0.205 & 0.635 \\
+\hline
+Silver & 8,991 & 7.29 ms & 0.215 & 0.657 \\
+\hline
+Bronze & 15,697 & 38.22 ms & 0.499 & 0.258 \\
+\hline
+\end{tabular}
+\end{table}
+
+Gold and Silver show moderate predictability ($R^2 \approx 0.64$--0.66), which is lower than for average delay. This is expected because the 90th percentile captures rarer, more variable congestion events. Bronze tail delay is much harder to predict ($R^2 = 0.258$), following the same pattern as average delay but amplified.
+
+\subsection{Jitter Results}
+
+Table~\ref{tab:jitter_results} shows the per-class results for jitter prediction.
+
+\begin{table}[H]
+\centering
+\caption{Per-Class Jitter Prediction Results using XGBoost (v1 Dataset)}
+\label{tab:jitter_results}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{QoS Class} & \textbf{Rows} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$} \\
+\hline
+Gold & 4,592 & 0.14 ms & 0.176 & 0.119 \\
+\hline
+Silver & 8,991 & 0.16 ms & 0.190 & 0.084 \\
+\hline
+Bronze & 15,697 & 3.11 ms & 0.678 & 0.014 \\
+\hline
+\end{tabular}
+\end{table}
+
+Jitter $R^2$ is very low across all classes (0.01--0.12). This is a meaningful finding rather than a modelling failure. The BNN-UPC features describe static network configuration: queue weights, scheduling policy, and offered bandwidth. These features determine mean delay well but do not capture the moment-to-moment traffic burstiness that drives jitter. Jitter prediction would require dynamic traffic features such as instantaneous queue occupancy or inter-arrival time statistics, which are not present in this dataset. This is discussed further as a limitation and future work direction.
+
+\section{Congested Regime Experiment (v2 Dataset)}
+
+The v2 dataset was generated to study QoS prediction under near-saturation conditions and to enable packet loss evaluation. Table~\ref{tab:v2_perclass} shows the per-class delay results on v2.
+
+\begin{table}[H]
+\centering
+\caption{Per-Class avg\_delay Prediction Results using XGBoost (v2 Dataset, Congested Regime)}
+\label{tab:v2_perclass}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{QoS Class} & \textbf{Rows} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$ Log Delay} \\
+\hline
+Gold & 30,246 & 22.51 ms & 0.455 & 0.724 \\
+\hline
+Silver & 59,216 & 38.41 ms & 0.570 & 0.677 \\
+\hline
+Bronze & 100,866 & 104.94 ms & 0.764 & 0.656 \\
+\hline
+\end{tabular}
+\end{table}
+
+$R^2$ dropped compared to v1 across all classes, despite having 6.5 times more training data. This is because the operating regime changed, not because more data made the model worse. In v1, Gold delays clustered tightly around 20--30 ms (low variance, easy to predict). In v2, Gold delays span 9 ms to 510 ms because the network swings between lightly loaded and near-saturated states depending on traffic intensity. That variance is harder to explain with static configuration features.
+
+This confirms that v1 and v2 represent complementary experiments: v1 demonstrates strong QoS prediction under normal operating conditions, while v2 studies model behaviour under stress.
+
+Table~\ref{tab:v2_sla} shows SLA violation precision for the v2 congested regime.
+
+\begin{table}[H]
+\centering
+\caption{SLA Violation Trigger Results using XGBoost (v2 Dataset, Congested Regime)}
+\label{tab:v2_sla}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{QoS Class} & \textbf{Threshold} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\hline
+Gold & 30 ms & 0.817 & 0.949 & 0.878 \\
+\hline
+Silver & 50 ms & 0.760 & 0.828 & 0.793 \\
+\hline
+Bronze & 100 ms & 0.814 & 0.768 & 0.791 \\
+\hline
+\end{tabular}
+\end{table}
+
+In the congested regime, actual violation rates are much higher (Gold 57\%, Silver 43\%, Bronze 46\%), so the model has more positive examples to learn from. This improves Bronze Recall substantially from 0.368 in v1 to 0.768 in v2, though at the cost of reduced Gold Precision compared to the near-perfect 0.994 seen in v1.
+
+\subsection{Packet Loss Analysis}
+
+The v2 dataset enables packet\_loss\_rate to be evaluated as a prediction target for the first time. Regression on the loss rate was attempted but produced near-zero or negative $R^2$ values across all classes (Gold: $-$0.010, Silver: $-$0.048, Bronze: $-$0.130). This result is a meaningful finding: packet loss in this dataset is driven by rare, bursty buffer overflow events that static network configuration features cannot reliably predict. Predicting the exact loss rate requires dynamic features such as instantaneous buffer occupancy, which are not available at training time.
+
+A more appropriate framing for packet loss prediction is binary classification: predicting whether a flow will experience any loss at all. The v2 dataset has 54\% of Gold flows, 68\% of Silver flows, and 84\% of Bronze flows experiencing some loss, which provides enough class balance for a binary classifier. This is left as a near-term next step.
 
 \section{Layer 3: Allocation Recommender}
 
@@ -613,13 +762,15 @@ No tested profile fully satisfies the strict Gold threshold of 20 ms. The recomm
 
 \section{Summary of Findings}
 
-The completed experiments show four main findings:
+The completed experiments show six main findings:
 
 \begin{itemize}
     \item Zenodo is useful for link capacity prediction, but not for per-class QoS allocation.
-    \item BNN-UPC provides a useful per-class QoS scheduling dataset.
-    \item Global BNN-UPC metrics hide class-level differences; Bronze is much harder to predict than Gold and Silver.
-    \item The Layer 3 recommender connects prediction to the original SD-WAN allocation question, and the next step is to compare XGBoost-based and MLP-based allocation decisions.
+    \item BNN-UPC provides a useful per-class QoS scheduling dataset. Global metrics hide class-level differences; Bronze is much harder to predict than Gold and Silver.
+    \item QoS-aware evaluation with per-class MAE, RMSLE, and SLA violation precision is essential for reporting honest model behaviour for SD-WAN.
+    \item delay\_p90 is moderately predictable ($R^2 \approx 0.64$--0.66 for Gold/Silver), but jitter is not predictable from static configuration features ($R^2 < 0.12$). This is a feature gap, not a modelling failure.
+    \item A congested regime (v2) dataset with 190,328 rows introduces meaningful packet loss across all QoS classes. R² drops compared to v1 because the operating regime is harder, not because the model degrades with more data.
+    \item Packet loss regression does not work with the available features. Binary classification of whether a flow will experience any loss is the appropriate next step.
 \end{itemize}
 
 \chapter{Project Plan and Timeline}
@@ -744,9 +895,10 @@ The core value of this project lies in enabling proactive Quality of Service (Qo
 
 Based on the current findings, future research should explore the following directions:
 \begin{itemize}
-    \item \textbf{Multi-Metric Prediction:} Extend the BNN-UPC work from delay prediction to jitter, packet loss, and throughput.
+    \item \textbf{Packet Loss Binary Classification:} The regression approach for packet\_loss\_rate does not work because static features cannot capture bursty buffer overflow events. A binary classifier predicting whether a flow experiences any loss is the immediate next step, using the v2 dataset where 54--84\% of flows per class have measurable loss.
     \item \textbf{Neural Allocation Recommender:} Extend the Layer 3 recommender to use the PyTorch MLP, then compare per-class allocation results against XGBoost using Gold/Silver/Bronze SLA thresholds.
-    \item \textbf{Better Bronze Prediction:} Improve recall for Bronze SLA violations, which are harder because Bronze delay is heavy-tailed.
+    \item \textbf{Better Bronze Prediction:} Improve recall for Bronze SLA violations. In v1, Bronze Recall was 0.368. In v2 it improves to 0.768, but precision and delay prediction accuracy decrease in the congested regime. A dedicated model or class-weighted training for Bronze remains worth exploring.
+    \item \textbf{Jitter Prediction with Dynamic Features:} Jitter is not predictable from static configuration features. Future work should explore adding dynamic traffic features such as instantaneous queue depth or inter-arrival time statistics.
     \item \textbf{More Allocation Profiles:} Test a wider search space of WFQ weights and include rerouting or extra-capacity decisions when no feasible weight profile exists.
     \item \textbf{Real-Time Integration:} Integrate the predictive model into an SD-WAN controller or policy engine.
     \item \textbf{Cross-Domain Generalisation:} Test the approach on more topologies, real traffic traces, or additional public datasets such as MAWI.
