@@ -35,9 +35,7 @@ After generation, run the Docker container (printed at the end of this script):
 from __future__ import annotations
 
 import argparse
-import os
 import random
-import re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -78,8 +76,11 @@ DRR_PROFILES = [
 # QoS scheduling weights (Gold=60%, Bronze=10%) produce visible delay/loss differences.
 # At 2000 bit/tu the network is ~14% utilised and all queues are empty — no differentiation.
 # At 10000 bit/tu small topologies (6-8 nodes) reach 50-80% utilisation where scheduling matters.
-MAX_AVG_LAMBDA = 10_000
-MIN_AVG_LAMBDA = 2_000
+# At 18000+ bit/tu the network pushes 90%+ utilisation, which (combined with smaller
+# buffers below) introduces buffer overflow loss across all QoS classes — needed so
+# packet_loss_rate becomes a learnable target instead of being zero for Gold/Silver.
+MAX_AVG_LAMBDA = 22_000   # v1 (no-loss dataset): 10_000
+MIN_AVG_LAMBDA = 7_000    # v1 (no-loss dataset): 2_000
 
 # ToS probability distributions per scenario (matches original ch20)
 TOS_PROBS_SKEWED = [0.10, 0.30, 0.60]   # Scenarios A/B/C: 10% Gold, 30% Silver, 60% Bronze
@@ -90,7 +91,10 @@ PKT_DIST_SMALL = "0,300,0.5,1700,0.5"     # generic: 300-bit or 1700-bit pkts
 PKT_DIST_LARGE = "0,500,0.4,1000,0.3,1400,0.3"  # generic: 500/1000/1400-bit
 
 LINK_BANDWIDTH = 100_000  # bits/time-unit (matches ch20)
-BUFFER_SIZE    = 32_000   # bits
+# Buffer size reduced from 32_000 to 8_000 bits so that traffic bursts can overflow
+# queues even for high-priority classes. This is what creates non-zero loss for
+# Gold/Silver and makes packet_loss_rate a meaningful prediction target.
+BUFFER_SIZE    = 8_000    # bits  (v1 no-loss dataset: 32_000)
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +231,10 @@ def generate_tm(
     Packet size distributions (generic format):
       0,<size1>,<prob1>,<size2>,<prob2>,...
     """
-    time_dists = ["0", "1", "2,10,5"]
+    # Added burstier ON-OFF patterns (short bursts of high traffic followed by quiet
+    # periods) so packets arrive in tight clusters that overwhelm small buffers. This
+    # is the main mechanism creating buffer-overflow loss for Gold/Silver flows.
+    time_dists = ["0", "1", "2,10,5", "2,3,12", "2,2,8"]
     pkt_dists  = [PKT_DIST_SMALL, PKT_DIST_LARGE]
 
     with tm_file.open("w") as fd:
