@@ -343,6 +343,11 @@ def process_dataset(
         print(f"  [{i:2d}/{len(archives)}] {archive.name:45s} → {len(rows):5d} flows")
 
     df = pd.DataFrame(all_rows)
+
+    # Add log-transformed delay so downstream training scripts have the target
+    # column they expect without a separate post-processing step.
+    df["log_avg_delay"] = np.log(df["avg_delay"].clip(lower=1e-9))
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)
 

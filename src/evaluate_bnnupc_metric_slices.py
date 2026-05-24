@@ -390,10 +390,29 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+RATE_TARGETS = {"packet_loss_rate"}  # targets that are rates (0–1), not time values
+
+
+def resolve_unit_scale(targets: list[str], args_unit_scale: float, args_scaled_unit: str) -> tuple[float, str]:
+    """Return appropriate unit_scale and scaled_unit for the given targets.
+
+    Rate targets (packet_loss_rate) must not use the default seconds-to-ms
+    scale of 1000 — that would produce nonsense values like 1000% loss.
+    If the caller passes --unit-scale explicitly we respect it; otherwise we
+    auto-select 100 / '%' for rate targets and 1000 / 'ms' for time targets.
+    """
+    is_rate = all(t in RATE_TARGETS for t in targets)
+    user_overrode = args_unit_scale != 1000.0  # default was not changed by user
+    if is_rate and not user_overrode:
+        return 100.0, "%"
+    return args_unit_scale, args_scaled_unit
+
+
 if __name__ == "__main__":
     args = parse_args()
     targets = args.target_column or DEFAULT_TARGETS
     models = args.model or ["XGBRegressor"]
+    unit_scale, scaled_unit = resolve_unit_scale(targets, args.unit_scale, args.scaled_unit)
     slice_results, sla_results = evaluate_bnnupc_metric_slices(
         input_path=args.input_path,
         slice_output_path=args.slice_output_path,
@@ -402,8 +421,8 @@ if __name__ == "__main__":
         model_names=models,
         cv_folds=args.cv_folds,
         random_state=args.random_state,
-        unit_scale=args.unit_scale,
-        scaled_unit=args.scaled_unit,
+        unit_scale=unit_scale,
+        scaled_unit=scaled_unit,
         sla_ms=args.sla_ms,
     )
     print(f"Metric slice evaluation written to: {args.slice_output_path}")
