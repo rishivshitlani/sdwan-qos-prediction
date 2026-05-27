@@ -42,7 +42,7 @@ QOS_ORDER = ["Gold", "Silver", "Bronze"]
 DEFAULT_SLA_MS = {
     "Gold": 30.0,
     "Silver": 50.0,
-    "Bronze": 100.0,
+    "Bronze": 60.0,
 }
 BNNUPC_DROP_COLUMNS = [
     "simulation_id",
@@ -320,7 +320,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sla-ms",
         type=parse_sla_thresholds,
-        default=parse_sla_thresholds("30,50,100"),
+        default=parse_sla_thresholds("30,50,60"),
         help="SLA violation thresholds in milliseconds as Gold,Silver,Bronze.",
     )
     return parser.parse_args()

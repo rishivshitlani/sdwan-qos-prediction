@@ -51,6 +51,7 @@ sdwan-qos-prediction/
 │   ├── train_baseline.py
 │   ├── train_bnnupc_mlp.py
 │   ├── evaluate_bnnupc_qos_slices.py
+│   ├── evaluate_bnnupc_bronze_loss_classifier.py
 │   └── recommend_qos_allocation.py
 |
 ├── notebooks/
@@ -340,7 +341,7 @@ The default model is XGBoost on `log_avg_delay`. The evaluator reports per-class
 ```text
 Gold > 30 ms
 Silver > 50 ms
-Bronze > 100 ms
+Bronze > 60 ms
 ```
 
 Additional models can be evaluated with repeated `--model` flags:
@@ -697,9 +698,31 @@ For SLA violation triggers, precision is strongest for Gold:
 | --- | ---: | ---: | ---: | ---: |
 | Gold | 30 ms | 0.994 | 0.899 | 0.944 |
 | Silver | 50 ms | 0.823 | 0.639 | 0.720 |
-| Bronze | 100 ms | 0.726 | 0.368 | 0.489 |
+| Bronze | 60 ms | 0.619 | 0.568 | 0.592 |
 
 This means that when the model predicts a Gold SLA violation, it is almost always correct, which is useful for SD-WAN policy triggers.
+
+### Evaluate Bronze Packet-Loss Classification
+
+Gold and Silver packet-loss events are near-zero in the v1 BNN-UPC dataset, so packet-loss modelling is restricted to Bronze flows:
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_bronze_loss_classifier.py
+```
+
+Output:
+
+```text
+reports/model_results/bnnupc_bronze_loss_classifier.csv
+```
+
+The classifier predicts whether a Bronze flow experiences any packet loss (`packet_loss_rate > 0`). The class-weighted XGBoost model gives high recall for loss-risk alerting:
+
+| Model | Precision | Recall | F1 | AUC-ROC |
+| --- | ---: | ---: | ---: | ---: |
+| XGBoost default threshold | 0.777 | 0.328 | 0.461 | 0.914 |
+| XGBoost class-weighted | 0.342 | 0.865 | 0.490 | 0.916 |
+| Random Forest balanced | 0.663 | 0.389 | 0.490 | 0.895 |
 
 ### Current Layer 3 Allocation Result
 

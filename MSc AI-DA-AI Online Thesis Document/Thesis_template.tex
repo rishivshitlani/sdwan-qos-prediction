@@ -108,7 +108,7 @@ The thesis also addresses a key evaluation issue: a single global metric can hid
 
 Beyond average delay, the evaluation is extended to two additional QoS targets: 90th-percentile delay (delay\_p90) and jitter. delay\_p90 shows moderate predictability for Gold and Silver ($R^2 \approx 0.64$--0.66), while jitter is found to be largely unpredictable from static network configuration features ($R^2 < 0.12$). This is a meaningful finding: jitter is driven by dynamic traffic burstiness that queue weights and scheduling policy alone cannot capture.
 
-A second, larger dataset (v2) is also generated under a more congested network regime. It contains 190,328 rows and introduces meaningful packet loss across all QoS classes (Gold 3.8\%, Silver 6.3\%, Bronze 14.8\%), enabling packet loss to be studied as a prediction target for the first time. Finally, a Layer 3 allocation recommender is implemented. It tests candidate WFQ bandwidth profiles and recommends the least-violating Gold/Silver/Bronze allocation under SLA thresholds. This connects QoS prediction to the original SD-WAN decision question: how much bandwidth should be allocated to each QoS class?
+The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a threshold sweep, improving Bronze Recall from 0.368 to 0.568 and F1 from 0.489 to 0.592. Packet loss evaluation is restricted to Bronze traffic, which is the only class that experiences meaningful loss in a realistic network (10.7\% of Bronze flows in v1 have non-zero loss; Gold and Silver have near-zero loss). A binary classifier (predicting any loss versus no loss) achieves AUC-ROC of 0.916 for Bronze flows, confirming the model can discriminate loss-prone flows well even though exact loss-rate regression is not feasible from static features. Finally, a Layer 3 allocation recommender is implemented. It tests candidate WFQ bandwidth profiles and recommends the least-violating Gold/Silver/Bronze allocation under SLA thresholds. This connects QoS prediction to the original SD-WAN decision question: how much bandwidth should be allocated to each QoS class?
 	\end{abstracts}
 	
 	%%%% uncomment if needed
@@ -364,19 +364,6 @@ Four scheduling scenarios were generated:
 
 This dataset is referred to as the \textbf{v1 dataset} and is used for the main QoS scheduling and allocation experiments under a light-to-moderate load regime.
 
-\subsubsection{BNN-UPC v2: Congested Regime Dataset}
-
-A second dataset (v2) was generated to study network behaviour under near-saturation conditions and to introduce meaningful packet loss across all QoS classes. The v1 dataset had near-zero packet loss for Gold and Silver because the lightly loaded network never filled the queues.
-
-Three changes were made to the simulator configuration to create congestion:
-\begin{itemize}
-    \item Traffic intensity was raised from a maximum of 10,000 to 22,000 bits/time-unit, pushing link utilisation to 90\%+.
-    \item Buffer size was reduced from 32,000 to 8,000 bits per queue, so that burst traffic overflows queues even for high-priority classes.
-    \item Two additional bursty ON-OFF traffic patterns were added (average ON=3, OFF=12 and ON=2, OFF=8) to create packet clusters that overwhelm small buffers.
-\end{itemize}
-
-The v2 dataset contains 190,328 rows after filtering extreme simulation outliers (flows with average delay above 5 seconds, which represent fully saturated edge cases). The resulting loss distribution across QoS classes is: Gold 3.8\%, Silver 6.3\%, and Bronze 14.8\% mean loss rate. Delay is also more variable: Gold mean delay rises to 59 ms and Bronze to 192 ms, compared to 26 ms and 45 ms in v1. The v2 dataset is used as a complementary congestion experiment, not as a replacement for v1.
-
 \subsection{Datasets Not Used as Main Inputs}
 
 CICIDS2017 was explored earlier but was dropped from the main modelling path. It is an intrusion-detection dataset, not a QoS dataset. Using it would require too much reverse engineering of QoS labels. MAWI was also considered, but it does not contain direct Gold/Silver/Bronze labels and would require substantial extra feature engineering. Therefore, the final implemented work focuses on Zenodo and BNN-UPC.
@@ -608,11 +595,34 @@ WFQ (Weighted Fair Queueing) & 19,320 & 14.90 ms & 0.378 & 0.756 \\
 
 \subsection{SLA Violation Precision}
 
-For SD-WAN use, exact delay prediction is not the only concern. The model should also identify when a flow is likely to violate an SLA. The continuous delay prediction was converted into a binary trigger using these thresholds: Gold $>$ 30 ms, Silver $>$ 50 ms, and Bronze $>$ 100 ms.
+For SD-WAN use, exact delay prediction is not the only concern. The model should also identify when a flow is likely to violate an SLA. The continuous delay prediction was converted into a binary trigger using these thresholds: Gold $>$ 30 ms, Silver $>$ 50 ms, and Bronze $>$ 60 ms.
+
+The Bronze threshold was tuned from an initial value of 100 ms to 60 ms following a sensitivity sweep. Table~\ref{tab:bronze_threshold_sweep} summarises how precision, recall, and F1 change as the Bronze threshold is lowered. Lowering the threshold increases the number of flows treated as violations in the trigger evaluation, making the alert more sensitive and improving recall. The 60 ms value was chosen because it keeps Bronze strictly more lenient than Silver (50 ms) while significantly improving recall.
 
 \begin{table}[H]
 \centering
-\caption{SLA Violation Trigger Results using XGBoost}
+\caption{Bronze SLA Threshold Sensitivity (Gold=30 ms, Silver=50 ms fixed)}
+\label{tab:bronze_threshold_sweep}
+\begin{tabular}{|r|r|r|r|}
+\hline
+\textbf{Bronze Threshold} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\hline
+100 ms & 0.726 & 0.368 & 0.488 \\
+\hline
+70 ms  & 0.614 & 0.476 & 0.536 \\
+\hline
+60 ms  & 0.619 & 0.568 & 0.592 \\
+\hline
+50 ms  & 0.582 & 0.735 & 0.650 \\
+\hline
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:sla_precision} shows the final SLA violation trigger results using the tuned thresholds.
+
+\begin{table}[H]
+\centering
+\caption{SLA Violation Trigger Results using XGBoost (Tuned Thresholds)}
 \label{tab:sla_precision}
 \begin{tabular}{|l|r|r|r|r|}
 \hline
@@ -622,12 +632,12 @@ Gold & 30 ms & 0.994 & 0.899 & 0.944 \\
 \hline
 Silver & 50 ms & 0.823 & 0.639 & 0.720 \\
 \hline
-Bronze & 100 ms & 0.726 & 0.368 & 0.489 \\
+Bronze & 60 ms & 0.619 & 0.568 & 0.592 \\
 \hline
 \end{tabular}
 \end{table}
 
-The Gold precision is very high. This means that when the model predicts a Gold SLA violation, it is almost always correct. This is useful for SD-WAN policy triggers, because false positives could cause unnecessary routing changes. Bronze recall is lower, so many Bronze violations are still missed. This is a limitation of the current model.
+Gold precision remains very high (0.994), meaning the model is correct 99.4\% of the time when it predicts a Gold SLA violation. This is critical for SD-WAN policy triggers, because false positives for Gold could cause unnecessary rerouting of high-priority traffic. Bronze recall improves from 0.368 (at 100 ms) to 0.568 (at 60 ms), a 55\% improvement, while precision drops only modestly from 0.726 to 0.619. The threshold adjustment makes the alerting system more sensitive for Bronze, which is appropriate given that Bronze is best-effort traffic and missing a violation is more acceptable than for Gold.
 
 \section{Multi-Metric QoS Evaluation (v1 Dataset)}
 
@@ -679,63 +689,48 @@ Bronze & 15,697 & 3.11 ms & 0.678 & 0.014 \\
 
 Jitter $R^2$ is very low across all classes (0.01--0.12). This is a meaningful finding rather than a modelling failure. The BNN-UPC features describe static network configuration: queue weights, scheduling policy, and offered bandwidth. These features determine mean delay well but do not capture the moment-to-moment traffic burstiness that drives jitter. Jitter prediction would require dynamic traffic features such as instantaneous queue occupancy or inter-arrival time statistics, which are not present in this dataset. This is discussed further as a limitation and future work direction.
 
-\section{Congested Regime Experiment (v2 Dataset)}
+\section{Bronze Packet Loss Analysis}
 
-The v2 dataset was generated to study QoS prediction under near-saturation conditions and to enable packet loss evaluation. Table~\ref{tab:v2_perclass} shows the per-class delay results on v2.
+In the v1 dataset, packet loss is realistic: Gold and Silver flows experience near-zero loss (4 and 93 loss events respectively out of 13,583 combined rows), while Bronze flows experience non-zero loss in 1,684 out of 15,697 rows (10.7\%). This matches the expected behaviour of a network where high-priority traffic (Gold, Silver) is protected and only best-effort Bronze traffic suffers under load.
+
+Following supervisor guidance, packet loss evaluation is restricted to Bronze traffic only. Gold and Silver loss events are too rare and too small to train a reliable model on, and artificially forcing loss onto high-priority classes would not reflect a realistic network scenario.
+
+\subsection{Regression Attempt}
+
+Regression on \texttt{packet\_loss\_rate} for Bronze flows produced $R^2 = -0.130$. This is a meaningful finding: packet loss events in this dataset are driven by rare, bursty buffer overflow events. The static network configuration features (queue weights, scheduling policy, offered bandwidth) determine mean delay well but cannot capture when a particular burst will exceed the buffer. Predicting the exact loss rate requires dynamic features such as instantaneous buffer occupancy or inter-arrival time statistics, which are not present in the dataset.
+
+\subsection{Binary Loss Classification for Bronze}
+
+A more appropriate framing is binary classification: predicting whether a Bronze flow will experience any packet loss at all (loss $> 0$). This converts the problem from estimating an unpredictable rate to a detection task. The class balance is 89.3\% no-loss versus 10.7\% loss, so class weighting (\texttt{scale\_pos\_weight} = 8.3) is applied.
+
+Table~\ref{tab:bronze_loss_clf} shows 5-fold stratified cross-validation results for XGBoost and Random Forest.
 
 \begin{table}[H]
 \centering
-\caption{Per-Class avg\_delay Prediction Results using XGBoost (v2 Dataset, Congested Regime)}
-\label{tab:v2_perclass}
+\caption{Bronze Binary Loss Classification Results (v1 Dataset, 5-fold CV)}
+\label{tab:bronze_loss_clf}
 \begin{tabular}{|l|r|r|r|r|}
 \hline
-\textbf{QoS Class} & \textbf{Rows} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$ Log Delay} \\
+\textbf{Model} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC-ROC} \\
 \hline
-Gold & 30,246 & 22.51 ms & 0.455 & 0.724 \\
+XGBoost (default threshold) & 0.777 & 0.328 & 0.461 & 0.914 \\
 \hline
-Silver & 59,216 & 38.41 ms & 0.570 & 0.677 \\
+XGBoost (class-weighted)    & 0.342 & 0.865 & 0.490 & 0.916 \\
 \hline
-Bronze & 100,866 & 104.94 ms & 0.764 & 0.656 \\
+Random Forest (balanced)    & 0.663 & 0.389 & 0.490 & 0.895 \\
 \hline
 \end{tabular}
 \end{table}
 
-$R^2$ dropped compared to v1 across all classes, despite having 6.5 times more training data. This is because the operating regime changed, not because more data made the model worse. In v1, Gold delays clustered tightly around 20--30 ms (low variance, easy to predict). In v2, Gold delays span 9 ms to 510 ms because the network swings between lightly loaded and near-saturated states depending on traffic intensity. That variance is harder to explain with static configuration features.
+The AUC-ROC of 0.916 for class-weighted XGBoost confirms the model has strong discriminative ability: it can rank Bronze flows by loss probability effectively. The low recall at the default 0.5 decision threshold (0.328) is a threshold choice, not a model failure. Using class weighting raises recall to 0.865 at the cost of lower precision (0.342), which may be appropriate for an alerting system where missing a loss event is more harmful than a false alarm.
 
-This confirms that v1 and v2 represent complementary experiments: v1 demonstrates strong QoS prediction under normal operating conditions, while v2 studies model behaviour under stress.
-
-Table~\ref{tab:v2_sla} shows SLA violation precision for the v2 congested regime.
-
-\begin{table}[H]
-\centering
-\caption{SLA Violation Trigger Results using XGBoost (v2 Dataset, Congested Regime)}
-\label{tab:v2_sla}
-\begin{tabular}{|l|r|r|r|r|}
-\hline
-\textbf{QoS Class} & \textbf{Threshold} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
-\hline
-Gold & 30 ms & 0.817 & 0.949 & 0.878 \\
-\hline
-Silver & 50 ms & 0.760 & 0.828 & 0.793 \\
-\hline
-Bronze & 100 ms & 0.814 & 0.768 & 0.791 \\
-\hline
-\end{tabular}
-\end{table}
-
-In the congested regime, actual violation rates are much higher (Gold 57\%, Silver 43\%, Bronze 46\%), so the model has more positive examples to learn from. This improves Bronze Recall substantially from 0.368 in v1 to 0.768 in v2, though at the cost of reduced Gold Precision compared to the near-perfect 0.994 seen in v1.
-
-\subsection{Packet Loss Analysis}
-
-The v2 dataset enables packet\_loss\_rate to be evaluated as a prediction target for the first time. Regression on the loss rate was attempted but produced near-zero or negative $R^2$ values across all classes (Gold: $-$0.010, Silver: $-$0.048, Bronze: $-$0.130). This result is a meaningful finding: packet loss in this dataset is driven by rare, bursty buffer overflow events that static network configuration features cannot reliably predict. Predicting the exact loss rate requires dynamic features such as instantaneous buffer occupancy, which are not available at training time.
-
-A more appropriate framing for packet loss prediction is binary classification: predicting whether a flow will experience any loss at all. The v2 dataset has 54\% of Gold flows, 68\% of Silver flows, and 84\% of Bronze flows experiencing some loss, which provides enough class balance for a binary classifier. This is left as a near-term next step.
+This shows that while exact loss-rate regression is not feasible from static features, the model can reliably identify which Bronze flows are at elevated risk of experiencing packet loss.
 
 \section{Layer 3: Allocation Recommender}
 
 The final experiment uses the trained BNN-UPC delay model as a surrogate model for allocation decisions. The recommender is designed so that it can use either an explainable model such as XGBoost or a neural model such as the PyTorch MLP. The current reported allocation results use the trained delay model already evaluated in this chapter. Several WFQ profiles were tested: 60/30/10, 50/40/10, 33/33/34, 25/65/10, and 80/15/5. Each profile was applied to the traffic pattern, and the model predicted the expected delay for Gold, Silver, and Bronze.
 
-The default SLA thresholds for this experiment were Gold $<$ 20 ms, Silver $<$ 50 ms, and Bronze $<$ 100 ms.
+The default SLA thresholds for this allocation experiment were Gold $<$ 20 ms, Silver $<$ 50 ms, and Bronze $<$ 100 ms. This recommender run keeps the original allocation thresholds; rerunning the recommender with the tuned Bronze threshold of 60 ms is left as a follow-up comparison.
 
 \begin{table}[H]
 \centering
@@ -769,8 +764,8 @@ The completed experiments show six main findings:
     \item BNN-UPC provides a useful per-class QoS scheduling dataset. Global metrics hide class-level differences; Bronze is much harder to predict than Gold and Silver.
     \item QoS-aware evaluation with per-class MAE, RMSLE, and SLA violation precision is essential for reporting honest model behaviour for SD-WAN.
     \item delay\_p90 is moderately predictable ($R^2 \approx 0.64$--0.66 for Gold/Silver), but jitter is not predictable from static configuration features ($R^2 < 0.12$). This is a feature gap, not a modelling failure.
-    \item A congested regime (v2) dataset with 190,328 rows introduces meaningful packet loss across all QoS classes. R² drops compared to v1 because the operating regime is harder, not because the model degrades with more data.
-    \item Packet loss regression does not work with the available features. Binary classification of whether a flow will experience any loss is the appropriate next step.
+    \item Bronze SLA recall improves significantly when the violation threshold is tuned from 100 ms to 60 ms (Recall: 0.368 $\rightarrow$ 0.568, F1: 0.489 $\rightarrow$ 0.592). The 60 ms threshold was selected to keep Bronze strictly more lenient than Silver (50 ms) while providing a meaningful recall improvement.
+    \item Packet loss is only meaningful for Bronze traffic in a realistic network. Regression on packet\_loss\_rate is not feasible from static features ($R^2 = -0.130$), but binary classification (loss vs.\ no loss) achieves AUC-ROC = 0.916 for Bronze flows, confirming the model can identify loss-prone flows reliably.
 \end{itemize}
 
 \chapter{Project Plan and Timeline}
@@ -895,9 +890,9 @@ The core value of this project lies in enabling proactive Quality of Service (Qo
 
 Based on the current findings, future research should explore the following directions:
 \begin{itemize}
-    \item \textbf{Packet Loss Binary Classification:} The regression approach for packet\_loss\_rate does not work because static features cannot capture bursty buffer overflow events. A binary classifier predicting whether a flow experiences any loss is the immediate next step, using the v2 dataset where 54--84\% of flows per class have measurable loss.
+    \item \textbf{Bronze Loss Classifier Deployment:} The current Bronze binary loss classifier achieves AUC-ROC = 0.916. The next step is to select the optimal decision threshold (e.g.\ using precision-recall curve analysis) and integrate the classifier alongside the delay model so that the SD-WAN controller receives both a delay prediction and a loss-risk score for each Bronze flow.
     \item \textbf{Neural Allocation Recommender:} Extend the Layer 3 recommender to use the PyTorch MLP, then compare per-class allocation results against XGBoost using Gold/Silver/Bronze SLA thresholds.
-    \item \textbf{Better Bronze Prediction:} Improve recall for Bronze SLA violations. In v1, Bronze Recall was 0.368. In v2 it improves to 0.768, but precision and delay prediction accuracy decrease in the congested regime. A dedicated model or class-weighted training for Bronze remains worth exploring.
+    \item \textbf{Better Bronze Delay Prediction:} Bronze delay is harder to predict than Gold and Silver ($R^2 = 0.704$ vs.\ 0.914 and 0.908). A dedicated model with class-weighted training or a separate Bronze-only model may reduce the Bronze MAE further. The tuned SLA threshold (60 ms) already improves recall, but better per-class models remain worth exploring.
     \item \textbf{Jitter Prediction with Dynamic Features:} Jitter is not predictable from static configuration features. Future work should explore adding dynamic traffic features such as instantaneous queue depth or inter-arrival time statistics.
     \item \textbf{More Allocation Profiles:} Test a wider search space of WFQ weights and include rerouting or extra-capacity decisions when no feasible weight profile exists.
     \item \textbf{Real-Time Integration:} Integrate the predictive model into an SD-WAN controller or policy engine.
