@@ -520,13 +520,13 @@ PyTorch MLP & 0.185 & 0.357 & 0.766 & 0.769 \\
 \end{tabular}
 \end{table}
 
-The PyTorch MLP is slightly ahead of XGBoost, but the difference is small. This means that the neural-network path is competitive and worth developing further. At the same time, XGBoost remains an important explainable tree-based baseline for this tabular dataset. The useful comparison is therefore not only which model has the highest global score, but also whether the MLP and XGBoost lead to similar per-class QoS and allocation decisions.
+The PyTorch MLP is slightly ahead of XGBoost on the global score, but the difference is small. This means that the neural-network path is competitive, while XGBoost remains an important explainable tree-based baseline for this tabular dataset. The useful comparison is therefore not only which model has the highest global score, but also whether the MLP and XGBoost behave similarly for each QoS class.
 
 \section{QoS-Aware Evaluation}
 
 A single global metric is not enough for BNN-UPC. Bronze delay is much more volatile than Gold and Silver delay. If all rows are pooled together, Bronze errors can dominate the score and hide how the model behaves for high-priority traffic.
 
-Therefore, the XGBoost model was evaluated using out-of-fold predictions and sliced by QoS class, scheduling scenario, and scheduling policy. This provides the current explainable baseline for class-aware evaluation. The same evaluation should also be applied to the PyTorch MLP in the next stage so that the neural model is assessed per class, not only through a global score.
+Therefore, the XGBoost model was evaluated using out-of-fold predictions and sliced by QoS class, scheduling scenario, and scheduling policy. This provides the current explainable baseline for class-aware evaluation. The same class-aware evaluation was then applied to the PyTorch MLP so that the neural model is assessed per class, not only through a global score.
 
 \subsection{Per-Class Results}
 
@@ -638,6 +638,66 @@ Bronze & 60 ms & 0.619 & 0.568 & 0.592 \\
 \end{table}
 
 Gold precision remains very high (0.994), meaning the model is correct 99.4\% of the time when it predicts a Gold SLA violation. This is critical for SD-WAN policy triggers, because false positives for Gold could cause unnecessary rerouting of high-priority traffic. Bronze recall improves from 0.368 (at 100 ms) to 0.568 (at 60 ms), a 55\% improvement, while precision drops only modestly from 0.726 to 0.619. The threshold adjustment makes the alerting system more sensitive for Bronze, which is appropriate given that Bronze is best-effort traffic and missing a violation is more acceptable than for Gold.
+
+\subsection{Model Comparison: XGBoost vs PyTorch MLP}
+
+The results above use XGBoost as the strongest explainable tree-based baseline. To evaluate the neural-network direction of the project, the same QoS-aware analysis was repeated for a PyTorch feedforward MLP (three hidden layers of 128, 64, and 32 units, ReLU activations, dropout 0.1, AdamW optimiser, early stopping). The outer out-of-fold evaluation protocol and metric functions are identical to the XGBoost evaluation; the MLP additionally uses an internal validation split inside each training fold for early stopping. This makes the per-class numbers directly comparable while avoiding validation leakage.
+
+Table~\ref{tab:model_compare_delay} compares per-class delay prediction.
+
+\begin{table}[H]
+\centering
+\caption{Per-Class Delay Prediction: XGBoost vs PyTorch MLP (v1 Dataset, 5-fold out-of-fold)}
+\label{tab:model_compare_delay}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{QoS Class} & \textbf{Model} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$} \\
+\hline
+Gold   & XGBoost & 3.05 & 0.160 & 0.914 \\
+\hline
+Gold   & MLP     & 3.08 & 0.161 & 0.912 \\
+\hline
+Silver & XGBoost & 3.48 & 0.168 & 0.908 \\
+\hline
+Silver & MLP     & 3.42 & 0.169 & 0.908 \\
+\hline
+Bronze & XGBoost & 20.68 & 0.451 & 0.704 \\
+\hline
+Bronze & MLP     & 20.60 & 0.450 & 0.705 \\
+\hline
+\end{tabular}
+\end{table}
+
+On delay prediction the two models are practically very similar: they agree to within roughly 0.1 ms of MAE and 0.002 of $R^2$ on every class. Neither modelling family has a meaningful advantage in this experiment. This is consistent with the well-documented finding that gradient-boosted trees and neural networks can perform comparably on small, static, tabular feature sets such as this one.
+
+Table~\ref{tab:model_compare_sla} compares SLA violation detection at the tuned thresholds.
+
+\begin{table}[H]
+\centering
+\caption{SLA Violation Detection: XGBoost vs PyTorch MLP (Tuned Thresholds)}
+\label{tab:model_compare_sla}
+\begin{tabular}{|l|r|l|r|r|r|}
+\hline
+\textbf{QoS Class} & \textbf{Threshold} & \textbf{Model} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\hline
+Gold   & 30 ms & XGBoost & 0.994 & 0.899 & 0.944 \\
+\hline
+Gold   & 30 ms & MLP     & 0.979 & 0.908 & 0.942 \\
+\hline
+Silver & 50 ms & XGBoost & 0.823 & 0.639 & 0.720 \\
+\hline
+Silver & 50 ms & MLP     & 0.791 & 0.715 & 0.751 \\
+\hline
+Bronze & 60 ms & XGBoost & 0.619 & 0.568 & 0.592 \\
+\hline
+Bronze & 60 ms & MLP     & 0.591 & 0.608 & 0.599 \\
+\hline
+\end{tabular}
+\end{table}
+
+On SLA detection a consistent pattern emerges: the MLP trades a small amount of precision for higher recall, most visibly on the harder Silver and Bronze classes (Silver recall rises from 0.639 to 0.715; Bronze recall from 0.568 to 0.608). In other words, the neural model raises slightly more alerts and therefore catches more true violations at the cost of more false alarms. Which behaviour is preferable depends on the operational priority: XGBoost's near-perfect Gold precision (0.994) is better when false positives on high-priority traffic must be avoided, while the MLP's higher recall is preferable when missing a violation is the greater concern.
+
+Overall, XGBoost is retained as the recommended model because it matches the MLP's accuracy while offering interpretability (feature importance) and substantially lower training cost. The MLP comparison confirms that the strong per-class results are a property of the data and features, not an artefact of a single model family.
 
 \section{Multi-Metric QoS Evaluation (v1 Dataset)}
 
@@ -757,7 +817,7 @@ No tested profile fully satisfies the strict Gold threshold of 20 ms. The recomm
 
 \section{Summary of Findings}
 
-The completed experiments show six main findings:
+The completed experiments show seven main findings:
 
 \begin{itemize}
     \item Zenodo is useful for link capacity prediction, but not for per-class QoS allocation.
@@ -766,6 +826,7 @@ The completed experiments show six main findings:
     \item delay\_p90 is moderately predictable ($R^2 \approx 0.64$--0.66 for Gold/Silver), but jitter is not predictable from static configuration features ($R^2 < 0.12$). This is a feature gap, not a modelling failure.
     \item Bronze SLA recall improves significantly when the violation threshold is tuned from 100 ms to 60 ms (Recall: 0.368 $\rightarrow$ 0.568, F1: 0.489 $\rightarrow$ 0.592). The 60 ms threshold was selected to keep Bronze strictly more lenient than Silver (50 ms) while providing a meaningful recall improvement.
     \item Packet loss is only meaningful for Bronze traffic in a realistic network. Regression on packet\_loss\_rate is not feasible from static features ($R^2 = -0.130$), but binary classification (loss vs.\ no loss) achieves AUC-ROC = 0.916 for Bronze flows, confirming the model can identify loss-prone flows reliably.
+    \item The PyTorch MLP matches XGBoost per class (delay $R^2$ within 0.002 on every class) but does not beat it, while trading a little precision for higher recall on the harder Silver and Bronze classes. XGBoost is retained as the recommended model for its equal accuracy, interpretability, and lower training cost.
 \end{itemize}
 
 \chapter{Project Plan and Timeline}

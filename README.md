@@ -354,6 +354,23 @@ Additional models can be evaluated with repeated `--model` flags:
   --model XGBRegressor
 ```
 
+### Evaluate PyTorch MLP by QoS Class and Policy
+
+The PyTorch MLP can be evaluated with the same out-of-fold QoS slices and SLA trigger metrics used for XGBoost:
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_mlp_slices.py
+```
+
+Outputs:
+
+```text
+reports/model_results/bnnupc_qos_slice_evaluation.csv
+reports/model_results/bnnupc_sla_violation_precision.csv
+```
+
+The MLP evaluator appends `PyTorchMLP` rows to the same report files so the per-class delay and SLA metrics can be compared directly with XGBoost.
+
 ### Evaluate Additional BNN-UPC QoS Metrics
 
 Manzoor's feedback was that each QoS metric should be evaluated with its own
