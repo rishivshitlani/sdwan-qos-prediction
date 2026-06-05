@@ -50,7 +50,9 @@ sdwan-qos-prediction/
 │   ├── process_bnnupc_dataset.py
 │   ├── train_baseline.py
 │   ├── train_bnnupc_mlp.py
+│   ├── train_bnnupc_ft_transformer.py
 │   ├── evaluate_bnnupc_qos_slices.py
+│   ├── evaluate_bnnupc_ft_transformer_slices.py
 │   ├── evaluate_bnnupc_bronze_loss_classifier.py
 │   └── recommend_qos_allocation.py
 |
@@ -286,7 +288,7 @@ ToS 1 = Silver
 ToS 2 = Bronze
 ```
 
-### Train BNN-UPC Baselines and MLP
+### Train BNN-UPC Baselines, MLP, and FT-Transformer
 
 The tree/SVR/linear baselines can be run through the generic trainer:
 
@@ -317,6 +319,20 @@ Output:
 
 ```text
 reports/model_results/bnnupc_mlp_log_delay_results.csv
+```
+
+The FT-Transformer is an attention-based tabular comparator. It tokenises
+numeric and categorical BNN-UPC features, applies self-attention across feature
+tokens, and predicts the same `log_avg_delay` target:
+
+```bash
+.venv/bin/python src/train_bnnupc_ft_transformer.py
+```
+
+Output:
+
+```text
+reports/model_results/bnnupc_ft_transformer_log_delay_results.csv
 ```
 
 Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This keeps repeated experiments in one report file.
@@ -370,6 +386,27 @@ reports/model_results/bnnupc_sla_violation_precision.csv
 ```
 
 The MLP evaluator appends `PyTorchMLP` rows to the same report files so the per-class delay and SLA metrics can be compared directly with XGBoost.
+
+### Evaluate FT-Transformer by QoS Class and Policy
+
+The FT-Transformer evaluator uses the same outer out-of-fold split and the same
+QoS/SLA metric functions as the XGBoost and MLP evaluators. Within each training
+fold it uses a small validation split for early stopping:
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_ft_transformer_slices.py
+```
+
+Outputs:
+
+```text
+reports/model_results/bnnupc_qos_slice_evaluation.csv
+reports/model_results/bnnupc_sla_violation_precision.csv
+```
+
+The evaluator appends `FTTransformer` rows to the shared reports. Current results
+make it useful as an attention-based comparison point, but not stronger than the
+simpler MLP/XGBoost baselines on this tabular feature set.
 
 ### Evaluate Additional BNN-UPC QoS Metrics
 
