@@ -402,9 +402,10 @@ The following models were trained and compared:
     \item \textbf{Random Forest Regressor:} A tree ensemble model.
     \item \textbf{XGBoost Regressor:} A gradient-boosted tree model.
     \item \textbf{PyTorch MLP:} A feedforward neural network with hidden layers of 128, 64, and 32 neurons.
+    \item \textbf{FT-Transformer:} A modern attention-based architecture for tabular data (Feature Tokenizer + Transformer), which tokenises each feature and applies self-attention across the feature tokens.
 \end{itemize}
 
-The simple ML models are important because they are easier to explain and are suitable for tabular data. XGBoost is treated as the strongest explainable tree-based baseline. The PyTorch MLP is treated as the main neural-network path for the project, because it tests whether a feedforward neural model can learn the same QoS delay behaviour and later support per-class allocation decisions.
+The simple ML models are important because they are easier to explain and are suitable for tabular data. XGBoost is treated as the strongest explainable tree-based baseline. The PyTorch MLP and the FT-Transformer represent the neural-network direction of the project: the MLP tests whether a standard feedforward network can learn the same QoS delay behaviour, while the FT-Transformer tests whether a modern, attention-based deep-learning architecture designed for tabular data can outperform the tree-based baseline.
 
 \section{Evaluation Methodology}
 
@@ -639,65 +640,86 @@ Bronze & 60 ms & 0.619 & 0.568 & 0.592 \\
 
 Gold precision remains very high (0.994), meaning the model is correct 99.4\% of the time when it predicts a Gold SLA violation. This is critical for SD-WAN policy triggers, because false positives for Gold could cause unnecessary rerouting of high-priority traffic. Bronze recall improves from 0.368 (at 100 ms) to 0.568 (at 60 ms), a 55\% improvement, while precision drops only modestly from 0.726 to 0.619. The threshold adjustment makes the alerting system more sensitive for Bronze, which is appropriate given that Bronze is best-effort traffic and missing a violation is more acceptable than for Gold.
 
-\subsection{Model Comparison: XGBoost vs PyTorch MLP}
+\subsection{Model Comparison: XGBoost vs MLP vs FT-Transformer}
 
-The results above use XGBoost as the strongest explainable tree-based baseline. To evaluate the neural-network direction of the project, the same QoS-aware analysis was repeated for a PyTorch feedforward MLP (three hidden layers of 128, 64, and 32 units, ReLU activations, dropout 0.1, AdamW optimiser, early stopping). The outer out-of-fold evaluation protocol and metric functions are identical to the XGBoost evaluation; the MLP additionally uses an internal validation split inside each training fold for early stopping. This makes the per-class numbers directly comparable while avoiding validation leakage.
+The results above use XGBoost as the strongest explainable tree-based baseline. To evaluate the neural-network direction of the project, the same QoS-aware analysis was repeated for two neural models of increasing sophistication:
+
+\begin{itemize}
+    \item A \textbf{PyTorch feedforward MLP} (three hidden layers of 128, 64, and 32 units, ReLU activations, dropout 0.1, AdamW optimiser, early stopping).
+    \item An \textbf{FT-Transformer} (Feature Tokenizer + Transformer), a modern attention-based architecture designed specifically for tabular data. Each feature (numeric or categorical) is converted into a learned token, a [CLS] token is prepended, three pre-norm Transformer blocks (eight attention heads, token dimension 64) apply self-attention across the feature tokens, and the final [CLS] representation is mapped to the predicted delay.
+\end{itemize}
+
+For all three models the outer out-of-fold evaluation protocol and metric functions are identical; the two neural models additionally use an internal validation split inside each training fold for early stopping. This makes the per-class numbers directly comparable while avoiding validation leakage. Including the FT-Transformer directly addresses the question of whether a modern deep-learning architecture, rather than a plain MLP, can outperform the tree-based baseline on this problem.
 
 Table~\ref{tab:model_compare_delay} compares per-class delay prediction.
 
 \begin{table}[H]
 \centering
-\caption{Per-Class Delay Prediction: XGBoost vs PyTorch MLP (v1 Dataset, 5-fold out-of-fold)}
+\caption{Per-Class Delay Prediction: XGBoost vs MLP vs FT-Transformer (v1 Dataset, 5-fold out-of-fold)}
 \label{tab:model_compare_delay}
-\begin{tabular}{|l|r|r|r|r|}
+\begin{tabular}{|l|l|r|r|r|}
 \hline
 \textbf{QoS Class} & \textbf{Model} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$} \\
 \hline
-Gold   & XGBoost & 3.05 & 0.160 & 0.914 \\
+Gold   & XGBoost        & 3.05 & 0.160 & 0.914 \\
 \hline
-Gold   & MLP     & 3.08 & 0.161 & 0.912 \\
+Gold   & MLP            & 3.08 & 0.161 & 0.912 \\
 \hline
-Silver & XGBoost & 3.48 & 0.168 & 0.908 \\
+Gold   & FT-Transformer & 3.20 & 0.172 & 0.900 \\
 \hline
-Silver & MLP     & 3.42 & 0.169 & 0.908 \\
+Silver & XGBoost        & 3.48 & 0.168 & 0.908 \\
 \hline
-Bronze & XGBoost & 20.68 & 0.451 & 0.704 \\
+Silver & MLP            & 3.42 & 0.169 & 0.908 \\
 \hline
-Bronze & MLP     & 20.60 & 0.450 & 0.705 \\
+Silver & FT-Transformer & 3.53 & 0.178 & 0.898 \\
+\hline
+Bronze & XGBoost        & 20.68 & 0.451 & 0.704 \\
+\hline
+Bronze & MLP            & 20.60 & 0.450 & 0.705 \\
+\hline
+Bronze & FT-Transformer & 20.52 & 0.452 & 0.703 \\
 \hline
 \end{tabular}
 \end{table}
 
-On delay prediction the two models are practically very similar: they agree to within roughly 0.1 ms of MAE and 0.002 of $R^2$ on every class. Neither modelling family has a meaningful advantage in this experiment. This is consistent with the well-documented finding that gradient-boosted trees and neural networks can perform comparably on small, static, tabular feature sets such as this one.
+On delay prediction all three models are practically very similar: per-class $R^2$ agrees to within about 0.01, and on the hardest class (Bronze) all three land at $R^2 \approx 0.70$. Neither neural model beats XGBoost; the FT-Transformer is in fact marginally behind on Gold and Silver (with reasonable but not exhaustive hyper-parameter tuning). This is consistent with the well-documented finding that gradient-boosted trees remain highly competitive with, and often superior to, deep-learning models on small, static, tabular feature sets such as this one.
+
+The most important observation is that all three model families converge to the same per-class ceiling. This strongly suggests that the limiting factor is the \emph{feature set}, not the choice of model: the static configuration features explain Gold and Silver delay very well but cannot fully capture Bronze's burst-driven variance, regardless of model capacity.
 
 Table~\ref{tab:model_compare_sla} compares SLA violation detection at the tuned thresholds.
 
 \begin{table}[H]
 \centering
-\caption{SLA Violation Detection: XGBoost vs PyTorch MLP (Tuned Thresholds)}
+\caption{SLA Violation Detection: XGBoost vs MLP vs FT-Transformer (Tuned Thresholds)}
 \label{tab:model_compare_sla}
 \begin{tabular}{|l|r|l|r|r|r|}
 \hline
 \textbf{QoS Class} & \textbf{Threshold} & \textbf{Model} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
 \hline
-Gold   & 30 ms & XGBoost & 0.994 & 0.899 & 0.944 \\
+Gold   & 30 ms & XGBoost        & 0.994 & 0.899 & 0.944 \\
 \hline
-Gold   & 30 ms & MLP     & 0.979 & 0.908 & 0.942 \\
+Gold   & 30 ms & MLP            & 0.979 & 0.908 & 0.942 \\
 \hline
-Silver & 50 ms & XGBoost & 0.823 & 0.639 & 0.720 \\
+Gold   & 30 ms & FT-Transformer & 0.980 & 0.898 & 0.937 \\
 \hline
-Silver & 50 ms & MLP     & 0.791 & 0.715 & 0.751 \\
+Silver & 50 ms & XGBoost        & 0.823 & 0.639 & 0.720 \\
 \hline
-Bronze & 60 ms & XGBoost & 0.619 & 0.568 & 0.592 \\
+Silver & 50 ms & MLP            & 0.791 & 0.715 & 0.751 \\
 \hline
-Bronze & 60 ms & MLP     & 0.591 & 0.608 & 0.599 \\
+Silver & 50 ms & FT-Transformer & 0.839 & 0.583 & 0.688 \\
+\hline
+Bronze & 60 ms & XGBoost        & 0.619 & 0.568 & 0.592 \\
+\hline
+Bronze & 60 ms & MLP            & 0.591 & 0.608 & 0.599 \\
+\hline
+Bronze & 60 ms & FT-Transformer & 0.597 & 0.580 & 0.589 \\
 \hline
 \end{tabular}
 \end{table}
 
-On SLA detection a consistent pattern emerges: the MLP trades a small amount of precision for higher recall, most visibly on the harder Silver and Bronze classes (Silver recall rises from 0.639 to 0.715; Bronze recall from 0.568 to 0.608). In other words, the neural model raises slightly more alerts and therefore catches more true violations at the cost of more false alarms. Which behaviour is preferable depends on the operational priority: XGBoost's near-perfect Gold precision (0.994) is better when false positives on high-priority traffic must be avoided, while the MLP's higher recall is preferable when missing a violation is the greater concern.
+On SLA detection the three models again behave similarly, with only small differences in the precision--recall balance. The MLP leans slightly towards higher recall on the harder Silver and Bronze classes, while XGBoost and the FT-Transformer are marginally more precision-oriented. Across all three models Gold precision stays very high (0.98--0.99), which is the most important property for SD-WAN policy triggers because false positives on high-priority traffic would cause unnecessary rerouting.
 
-Overall, XGBoost is retained as the recommended model because it matches the MLP's accuracy while offering interpretability (feature importance) and substantially lower training cost. The MLP comparison confirms that the strong per-class results are a property of the data and features, not an artefact of a single model family.
+Overall, XGBoost is retained as the recommended model: it matches or slightly exceeds both neural models on accuracy while offering interpretability (feature importance) and substantially lower training cost (seconds versus minutes per fold for the FT-Transformer). The progression from a tree-based baseline through a feedforward MLP to a modern tabular Transformer confirms that the strong per-class results are a property of the data and features, not an artefact of a single model family, and that added model complexity does not improve QoS delay prediction on this dataset.
 
 \section{Multi-Metric QoS Evaluation (v1 Dataset)}
 
@@ -826,7 +848,7 @@ The completed experiments show seven main findings:
     \item delay\_p90 is moderately predictable ($R^2 \approx 0.64$--0.66 for Gold/Silver), but jitter is not predictable from static configuration features ($R^2 < 0.12$). This is a feature gap, not a modelling failure.
     \item Bronze SLA recall improves significantly when the violation threshold is tuned from 100 ms to 60 ms (Recall: 0.368 $\rightarrow$ 0.568, F1: 0.489 $\rightarrow$ 0.592). The 60 ms threshold was selected to keep Bronze strictly more lenient than Silver (50 ms) while providing a meaningful recall improvement.
     \item Packet loss is only meaningful for Bronze traffic in a realistic network. Regression on packet\_loss\_rate is not feasible from static features ($R^2 = -0.130$), but binary classification (loss vs.\ no loss) achieves AUC-ROC = 0.916 for Bronze flows, confirming the model can identify loss-prone flows reliably.
-    \item The PyTorch MLP matches XGBoost per class (delay $R^2$ within 0.002 on every class) but does not beat it, while trading a little precision for higher recall on the harder Silver and Bronze classes. XGBoost is retained as the recommended model for its equal accuracy, interpretability, and lower training cost.
+    \item Three model families were compared per class under an identical evaluation protocol: XGBoost, a feedforward MLP, and a modern attention-based FT-Transformer. All three converge to the same per-class ceiling (Bronze $R^2 \approx 0.70$ for every model), and neither neural model beats XGBoost. This shows the limiting factor is the static feature set, not model capacity, and XGBoost is retained as the recommended model for its equal accuracy, interpretability, and far lower training cost.
 \end{itemize}
 
 \chapter{Project Plan and Timeline}
