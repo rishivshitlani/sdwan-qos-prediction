@@ -30,6 +30,7 @@ reports/
 reports/*
 !reports/model_results/
 reports/model_results/*
+!reports/model_results/README.md
 !reports/model_results/*.csv
 reports/model_results/model_results.csv
 reports/model_results/zenodo_baseline_recommended_bandwidth_results.csv

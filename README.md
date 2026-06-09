@@ -70,6 +70,10 @@ sdwan-qos-prediction/
 
 Most raw/processed data files, the virtual environment, and model artifacts are ignored by Git. Curated report CSVs under `reports/model_results/` can be committed when they document a meaningful experiment.
 
+## Report CSVs
+
+Use `reports/model_results/` as the canonical location for experiment outputs. The folder-level guide at `reports/model_results/README.md` explains which CSV is which, where the FT-Transformer rows are stored, and which files are most relevant for the thesis.
+
 ## Datasets
 
 This project currently supports four dataset paths:
@@ -335,6 +339,8 @@ Output:
 reports/model_results/bnnupc_ft_transformer_log_delay_results.csv
 ```
 
+This standalone training report is generated only when `src/train_bnnupc_ft_transformer.py` is run. The currently checked-in FT-Transformer evaluation rows are in the shared QoS reports; see `reports/model_results/README.md` for the exact file map and current summary.
+
 Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This keeps repeated experiments in one report file.
 
 ### Evaluate BNN-UPC by QoS Class and Policy
@@ -404,9 +410,7 @@ reports/model_results/bnnupc_qos_slice_evaluation.csv
 reports/model_results/bnnupc_sla_violation_precision.csv
 ```
 
-The evaluator appends `FTTransformer` rows to the shared reports. Current results
-make it useful as an attention-based comparison point, but not stronger than the
-simpler MLP/XGBoost baselines on this tabular feature set.
+The evaluator appends `FTTransformer` rows to the shared reports. Current results make FT-Transformer useful as an attention-based comparison point, but not stronger than the simpler MLP/XGBoost baselines on this tabular feature set. See `reports/model_results/README.md` for the current FT-Transformer metrics and SLA-trigger report locations.
 
 ### Evaluate Additional BNN-UPC QoS Metrics
 

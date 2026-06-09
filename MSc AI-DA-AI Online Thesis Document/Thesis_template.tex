@@ -19,7 +19,6 @@
 \usepackage{xcolor}
 \usepackage{graphicx}
 %\usepackage{subfigure}
-\usepackage{hyperref}
 \usepackage{float}
 \usepackage[pdftex]{graphicx}
 \usepackage[utf8]{inputenc}
@@ -28,6 +27,10 @@
 
 \linespread{1.5}
 %\onehalfspacing
+
+% Allow LaTeX a little extra slack on hard-to-break lines (e.g. long \texttt
+% identifiers with underscores) so they do not overflow into the margin.
+\emergencystretch=3em
 
 % SPECIAL COMMANDS
 % correct bad hyphenation
@@ -49,7 +52,7 @@
 \author{Radhika Shitlani (Preferred Name : Rishiv)}
 \collegeordept{School of Computer Science}
 \university{University of Galway}
-\crest{\includegraphics[width=135mm]{Figures/University_Of_Galway_Logo__Positive_Landscape.png}}
+\crest{\includegraphics[width=90mm]{Figures/University_Of_Galway_Logo__Positive_Landscape.png}}
 %\crest{\includegraphics[width=80mm]{Figures/University_of_Galway_logo_2022.png}}
 
 \supervisor{Dr. Jawad Manzoor}
@@ -67,8 +70,10 @@
 %\loadglsentries{glossary}
 
 \begin{document}
-		\maketitle
-	
+		% Single-space the title page so the title block fits on one page;
+		% the rest of the document uses the 1.5 spacing set in the preamble.
+		{\linespread{1}\selectfont\maketitle}
+
 	% add an empty page after title page
 	\newpage\null\thispagestyle{empty}\newpage
 	
@@ -83,7 +88,7 @@
 	I, Radhika(Rishiv) Shitlani, hereby declare that this thesis, titled ``AI-Driven QoS Prediction in SD-WAN Networks'', and the work presented in it are entirely my own except where explicitly stated otherwise in the text, and that this work has not been previously submitted, in part or whole, to any university or institution for any degree, diploma, or other qualification. 
 	\newline
 	
-	\begin{tabular}{@{}p{.5in}p{4in}@{}}
+	\begin{tabular}{@{}p{.9in}p{3.4in}@{}}
 		Signature: & ~~\hrulefill \\
 	\end{tabular}
 	\newpage
@@ -102,7 +107,7 @@ Software-Defined Wide Area Networks (SD-WAN) are used to connect branch offices,
 
 This thesis investigates whether machine learning can predict QoS behaviour in SD-WAN-like environments and support proactive QoS decisions. The work uses two public-data-based experiments. The first experiment uses the Zenodo 5G campus network dataset to predict achieved throughput from radio and traffic configuration features. This acts as a link-capacity prediction baseline. The second experiment uses a locally generated BNN-UPC/BNNetSimulator dataset to study per-class QoS delay for Gold, Silver, and Bronze traffic under different scheduling policies.
 
-For the Zenodo dataset, Random Forest achieved the strongest throughput result among the tested models, with a cross-validated $R^2$ of approximately 0.94. XGBoost is close behind at 0.93. The dataset is useful for link capacity prediction, but it does not contain QoS class variation. For the BNN-UPC dataset, XGBoost acts as the strongest explainable tree-based baseline, while the PyTorch feedforward neural network is the main neural-network path. Both models achieved similar performance on the log-transformed average delay target, with cross-validated $R^2$ values around 0.766--0.769.
+For the Zenodo dataset, Random Forest achieved the strongest throughput result among the tested models, with a cross-validated $R^2$ of approximately 0.94. XGBoost is close behind at 0.93. The dataset is useful for link capacity prediction, but it does not contain QoS class variation. For the BNN-UPC dataset, XGBoost was compared with two neural models: a PyTorch feedforward MLP and an FT-Transformer. All three models achieved similar performance on the log-transformed average delay target, with cross-validated $R^2$ values around 0.766--0.769, and the per-class results converged to the same Bronze ceiling.
 
 The thesis also addresses a key evaluation issue: a single global metric can hide poor performance for one QoS class. Therefore, the BNN-UPC model is evaluated by QoS class, scheduling scenario, and scheduling policy. The results show that Gold and Silver delay are predicted much more accurately than Bronze delay, with per-class $R^2$ values of 0.914, 0.908, and 0.704 respectively on a lightly loaded dataset.
 
@@ -113,8 +118,8 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
 	
 	%%%% uncomment if needed
 	\tableofcontents
-	%%%%\listoffigures
-	%%%%\listoftables
+	\listoffigures
+	\listoftables
 	%%%%\printglossary[title=List of Acronyms,type=\acronymtype]
 		
 	
@@ -134,7 +139,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     \subsection*{Scope and Context}
     
-    This thesis explores how AI and ML techniques can be used to predict QoS in SD-WAN-like networks. The project began with a broad focus on QoS prediction, but the implemented work now has three connected layers. Layer 1 predicts link capacity using the Zenodo 5G dataset. Layer 2 predicts per-class delay using a BNN-UPC/BNNetSimulator dataset, using XGBoost as the strongest explainable tree-based baseline and PyTorch MLP as the main neural-network direction. Layer 3 uses the delay model to recommend a WFQ bandwidth allocation for Gold, Silver, and Bronze traffic.
+    This thesis explores how AI and ML techniques can be used to predict QoS in SD-WAN-like networks. The project began with a broad focus on QoS prediction, but the implemented work now has three connected layers. Layer 1 predicts link capacity using the Zenodo 5G dataset. Layer 2 predicts per-class delay using a BNN-UPC/BNNetSimulator dataset, using XGBoost as the strongest explainable tree-based baseline and comparing it against two neural models: a feedforward MLP and an FT-Transformer. Layer 3 uses the delay model to recommend a WFQ bandwidth allocation for Gold, Silver, and Bronze traffic.
     
     \subsection*{Problem Statement}
     
@@ -142,7 +147,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     \subsection*{Research Questions}
     
-    This report aims to answer the following questions:
+    This thesis aims to answer the following questions:
     \begin{itemize}
         \item \textbf{RQ1}: What types of AI or ML techniques are currently or can be used for predicting QoS in SD-WAN?
         \item \textbf{RQ2}: What are the benefits and limitations of these approaches in terms of prediction accuracy, scalability, and real-world use?
@@ -153,7 +158,9 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     To explore these questions, I conducted a literature review using academic databases like IEEE Xplore, Scopus, and Google Scholar. I searched for terms such as “QoS prediction,” “SD-WAN,” “machine learning in networking,” and “AI-based traffic forecasting.” Papers published between 2020 and 2025 were prioritized, and older foundational works were included when relevant.
 
-    The implementation then followed an experimental approach. First, public datasets were reviewed and unsuitable proxy datasets were removed from the main modelling path. Second, supervised ML models were trained on the Zenodo and BNN-UPC datasets, including both classical ML models and a PyTorch MLP. Third, the BNN-UPC results were evaluated using QoS-aware metrics, including per-class error, policy-specific slicing, RMSLE, and SLA violation precision. Finally, a simple allocation recommender was built to connect prediction to an SD-WAN control decision. A planned next step is to run the same allocation evaluation using the MLP and compare its recommendations with XGBoost.
+    The implementation then followed an experimental approach. First, public datasets were reviewed and unsuitable proxy datasets were removed from the main modelling path. Second, supervised ML models were trained on the Zenodo and BNN-UPC datasets, including classical ML models, a feedforward MLP, and an FT-Transformer. Third, the BNN-UPC results were evaluated using QoS-aware metrics, including per-class error, policy-specific slicing, RMSLE, and SLA violation precision. Finally, a simple allocation recommender was built to connect prediction to an SD-WAN control decision. The allocation recommender currently uses the XGBoost delay model; extending it to the neural models is left as future work.
+
+    The literature review and background material in this thesis are secondary research, summarising work already published by others. The dataset generation, preprocessing, modelling, QoS-aware evaluation, and allocation recommender are the author's own primary research and constitute the contribution of this work.
     
     \subsection*{Structure of the Document}
     
@@ -165,9 +172,8 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
         \item Chapter~\ref{chap:lit_review} presents the literature review, including an analysis of academic work on QoS prediction in SD-WAN using AI and ML techniques.
         \item Chapter~\ref{chap:methodology} outlines the methodology, including dataset selection, feature engineering, model design, QoS-aware evaluation, and the allocation recommender.
         \item Chapter~\ref{chap:results} presents the experimental setup and results for the Zenodo and BNN-UPC datasets.
-        \item Chapter~\ref{chap:timeline} details the project plan, timeline, tools, and supervision checkpoints.
-        \item Chapter~\ref{chap:risks} discusses the risks and limitations of the project, including data availability, model complexity, and real-world constraints.
-        \item Chapter~\ref{chap:conclusion} concludes the report by summarizing findings, highlighting real-world impact, and identifying directions for future work.
+        \item Chapter~\ref{chap:limitations} states the limitations of the work, including data realism, the static-feature ceiling, and offline evaluation.
+        \item Chapter~\ref{chap:conclusion} concludes the thesis by summarising findings, discussing impact, and identifying directions for future work.
     \end{itemize}
 
 
@@ -254,7 +260,7 @@ The selected papers cover a range of methods and applications—some focus on pr
 \centering
 \caption{Summary and Categorisation of Selected Literature}
 \label{tab:lit-summary}
-\begin{tabular}{|p{3.8cm}|p{3.5cm}|p{5.0cm}|p{2.2cm}|}
+\begin{tabular}{|p{3.1cm}|p{3.0cm}|p{4.4cm}|p{1.8cm}|}
 \hline
 \textbf{Paper} & \textbf{AI/ML Technique} & \textbf{Main Focus} & \textbf{Related RQ(s)} \\
 \hline
@@ -310,11 +316,11 @@ Despite the progress seen in these papers, several gaps were noticed:
 
 Filling these gaps could make QoS prediction models more robust, more generalizable, and more useful for industry.
 
-\section{Summary Of Literature Review So Far}
+\section{Summary of the Literature Review}
 
-This review found that AI and ML models especially supervised learning, deep learning, and reinforcement learning, are promising tools for predicting QoS trends in SD-WAN. The models help forecast traffic load, classify application needs, and adjust routing or resource allocation dynamically. However, practical deployment still faces challenges due to training complexity, hardware requirements, and lack of real-world validation.
+This review found that AI and ML models, especially supervised learning, deep learning, and reinforcement learning, are promising tools for predicting QoS trends in SD-WAN. The models help forecast traffic load, classify application needs, and adjust routing or resource allocation dynamically. However, practical deployment still faces challenges due to training complexity, hardware requirements, and a lack of real-world validation.
 
-Although the number of direct studies focused on AI-based QoS prediction in SD-WAN remains limited, the relevance of the topic continues to grow as networks become more software-defined and application-aware. Recent work such as MTEAL~\cite{chen2025mteal} also shows that state-of-the-art SD-WAN traffic engineering is moving beyond simple machine learning models towards graph neural networks, reinforcement learning, and multi-dimensional QoS optimisation. Based on the review and in consultation with Dr. Jawad Manzoor, this project will keep simple models as baselines only, while exploring stronger non-linear and deep-learning-inspired approaches where feasible. The scope will be carefully managed so that the chosen datasets, techniques, and evaluation metrics remain realistic within the resources and time frame of a master's-level project.
+Although the number of direct studies focused on AI-based QoS prediction in SD-WAN remains limited, the relevance of the topic continues to grow as networks become more software-defined and application-aware. Recent work such as MTEAL~\cite{chen2025mteal} shows that state-of-the-art SD-WAN traffic engineering is moving beyond simple machine learning towards graph neural networks, reinforcement learning, and multi-dimensional QoS optimisation. Informed by this review, the present work uses simple models as baselines and additionally evaluates stronger tree-based and deep-learning models (XGBoost, a feedforward MLP, and an FT-Transformer). The scope was deliberately kept realistic for a master's-level project: the comparison focuses on per-class delay prediction on a reproducible dataset rather than on full reinforcement-learning-based control.
 
 
 
@@ -330,6 +336,8 @@ The project uses a layered methodology:
     \item \textbf{Layer 2: Per-class delay prediction.} A BNN-UPC/BNNetSimulator dataset is used to predict delay for Gold, Silver, and Bronze traffic classes under different scheduling policies.
     \item \textbf{Layer 3: Allocation recommendation.} The trained delay model is used as a surrogate model to test candidate WFQ weight profiles and recommend a Gold/Silver/Bronze bandwidth allocation.
 \end{itemize}
+
+All data-generation, preprocessing, modelling, and evaluation code, together with the generated BNN-UPC dataset, is available in the project's public code repository.\footnote{Code and generated data: \url{https://github.com/rishivshitlani/sdwan-qos-prediction}.}
 
 \section{Dataset Selection}
 
@@ -409,7 +417,16 @@ The simple ML models are important because they are easier to explain and are su
 
 \section{Evaluation Methodology}
 
-The first evaluations used common regression metrics: MAE, RMSE, $R^2$, cross-validation scores, and inference time. However, for BNN-UPC this is not enough. Gold, Silver, and Bronze traffic have different priorities and different delay behaviour. A single global metric can hide poor performance for one class.
+The first evaluations used common regression metrics, defined here for clarity:
+
+\begin{itemize}
+    \item \textbf{Mean Absolute Error (MAE):} the average absolute difference between predicted and actual values. It is easy to interpret and relatively insensitive to outliers.
+    \item \textbf{Root Mean Squared Error (RMSE):} the square root of the mean squared error. It penalises large errors more heavily than MAE.
+    \item \textbf{$R^2$ score:} the proportion of variance in the target that the model explains. A value of 1.0 is perfect, 0.0 is no better than predicting the mean, and negative values are worse than the mean. Five-fold cross-validated $R^2$ is also reported to check stability.
+    \item \textbf{Inference time:} the time taken to produce a prediction. This matters for SD-WAN, where decisions must be made in near-real time.
+\end{itemize}
+
+These global metrics are necessary but not sufficient for BNN-UPC. Gold, Silver, and Bronze traffic have different priorities and different delay behaviour, and a single global metric can hide poor performance for one class.
 
 Therefore, the BNN-UPC evaluation was extended using the following methods:
 
@@ -435,7 +452,7 @@ Both targets are heavy-tailed like average delay, so a log transformation is app
 
 \section{Layer 3 Allocation Recommender}
 
-The final implemented component is a simple allocation recommender. It is model-agnostic: it can use a trained BNN-UPC delay model, such as XGBoost or the PyTorch MLP, to test candidate WFQ profiles such as:
+The final implemented component is a simple allocation recommender. It is model-agnostic: it can use any trained BNN-UPC delay model (XGBoost, the MLP, or the FT-Transformer) to test candidate WFQ profiles such as:
 
 \begin{itemize}
     \item 60/30/10
@@ -445,7 +462,7 @@ The final implemented component is a simple allocation recommender. It is model-
     \item 80/15/5
 \end{itemize}
 
-Each profile represents a possible Gold/Silver/Bronze bandwidth allocation. For each profile, the recommender rewrites the queue-weight features, predicts class-level delay, checks SLA thresholds, and ranks the profiles. The current reported allocation results use the trained delay model already evaluated in this thesis. The next planned version will run the same allocation workflow with the PyTorch MLP and compare the per-class recommendations against XGBoost. This directly addresses the original SD-WAN question: how much bandwidth should be allocated to each QoS class?
+Each profile represents a possible Gold/Silver/Bronze bandwidth allocation. For each profile, the recommender rewrites the queue-weight features, predicts class-level delay, checks SLA thresholds, and ranks the profiles. The reported allocation results use the trained XGBoost delay model; running the same workflow with the neural models is left as future work. This directly addresses the original SD-WAN question: how much bandwidth should be allocated to each QoS class?
 
 
 \chapter{Experiments and Results}
@@ -467,7 +484,7 @@ Table~\ref{tab:zenodo_results} shows the Zenodo throughput results after droppin
 
 \begin{table}[H]
 \centering
-\caption{Zenodo Throughput Prediction Results (Target: \texttt{actual\_throughput\_mbps})}
+\caption[Zenodo Throughput Prediction Results]{Zenodo Throughput Prediction Results (Target: \texttt{actual\_throughput\_mbps})}
 \label{tab:zenodo_results}
 \begin{tabular}{|l|r|r|r|r|}
 \hline
@@ -579,20 +596,27 @@ Table~\ref{tab:policy_results} shows results sliced by scheduling policy. Strict
 
 \begin{table}[H]
 \centering
-\caption{BNN-UPC Scheduling Policy Evaluation using XGBoost (v1 Dataset)}
+\caption{BNN-UPC Scheduling Policy Evaluation using XGBoost (v1 Dataset). Policies: SP (Strict Priority), DRR (Deficit Round Robin), WFQ (Weighted Fair Queueing).}
 \label{tab:policy_results}
 \begin{tabular}{|l|r|r|r|r|}
 \hline
-\textbf{Policy} & \textbf{Rows} & \textbf{MAE Delay} & \textbf{RMSLE} & \textbf{$R^2$ Log Delay} \\
+\textbf{Policy} & \textbf{Rows} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$} \\
 \hline
-SP (Strict Priority) & 8,120 & 8.27 ms & 0.282 & 0.806 \\
+SP & 8,120 & 8.27 & 0.282 & 0.806 \\
 \hline
-DRR (Deficit Round Robin) & 1,840 & 8.01 ms & 0.302 & 0.678 \\
+DRR & 1,840 & 8.01 & 0.302 & 0.678 \\
 \hline
-WFQ (Weighted Fair Queueing) & 19,320 & 14.90 ms & 0.378 & 0.756 \\
+WFQ & 19,320 & 14.90 & 0.378 & 0.756 \\
 \hline
 \end{tabular}
 \end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{Figures/fig_policy_r2.pdf}
+\caption{Delay prediction $R^2$ by scheduling policy (XGBoost). Strict Priority is the easiest to predict because its priority order is deterministic; DRR is the hardest.}
+\label{fig:policy_r2}
+\end{figure}
 
 \subsection{SLA Violation Precision}
 
@@ -618,6 +642,13 @@ The Bronze threshold was tuned from an initial value of 100 ms to 60 ms followin
 \hline
 \end{tabular}
 \end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.72\textwidth]{Figures/fig_bronze_threshold_sweep.pdf}
+\caption{Bronze SLA threshold sensitivity for XGBoost. As the threshold is lowered from left to right, recall rises and precision falls. The chosen 60 ms value balances the two while staying more lenient than Silver (50 ms).}
+\label{fig:bronze_sweep}
+\end{figure}
 
 Table~\ref{tab:sla_precision} shows the final SLA violation trigger results using the tuned thresholds.
 
@@ -684,6 +715,13 @@ Bronze & FT-Transformer & 20.52 & 0.452 & 0.703 \\
 
 On delay prediction all three models are practically very similar: per-class $R^2$ agrees to within about 0.01, and on the hardest class (Bronze) all three land at $R^2 \approx 0.70$. Neither neural model beats XGBoost; the FT-Transformer is in fact marginally behind on Gold and Silver (with reasonable but not exhaustive hyper-parameter tuning). This is consistent with the well-documented finding that gradient-boosted trees remain highly competitive with, and often superior to, deep-learning models on small, static, tabular feature sets such as this one.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{Figures/fig_perclass_r2.pdf}
+\caption{Per-class delay prediction $R^2$ for the three models. All three converge to almost identical performance per class, and all reach the same ceiling on the hard Bronze class ($R^2 \approx 0.70$), indicating that the limiting factor is the static feature set rather than model capacity.}
+\label{fig:perclass_r2}
+\end{figure}
+
 The most important observation is that all three model families converge to the same per-class ceiling. This strongly suggests that the limiting factor is the \emph{feature set}, not the choice of model: the static configuration features explain Gold and Silver delay very well but cannot fully capture Bronze's burst-driven variance, regardless of model capacity.
 
 Table~\ref{tab:model_compare_sla} compares SLA violation detection at the tuned thresholds.
@@ -718,6 +756,13 @@ Bronze & 60 ms & FT-Transformer & 0.597 & 0.580 & 0.589 \\
 \end{table}
 
 On SLA detection the three models again behave similarly, with only small differences in the precision--recall balance. The MLP leans slightly towards higher recall on the harder Silver and Bronze classes, while XGBoost and the FT-Transformer are marginally more precision-oriented. Across all three models Gold precision stays very high (0.98--0.99), which is the most important property for SD-WAN policy triggers because false positives on high-priority traffic would cause unnecessary rerouting.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{Figures/fig_perclass_sla_f1.pdf}
+\caption{Per-class SLA-violation F1 score for the three models at the tuned thresholds (Gold 30 ms, Silver 50 ms, Bronze 60 ms). The models behave similarly; differences reflect small shifts in the precision--recall balance rather than a clear winner.}
+\label{fig:perclass_sla_f1}
+\end{figure}
 
 Overall, XGBoost is retained as the recommended model: it matches or slightly exceeds both neural models on accuracy while offering interpretability (feature importance) and substantially lower training cost (seconds versus minutes per fold for the FT-Transformer). The progression from a tree-based baseline through a feedforward MLP to a modern tabular Transformer confirms that the strong per-class results are a property of the data and features, not an artefact of a single model family, and that added model complexity does not improve QoS delay prediction on this dataset.
 
@@ -851,95 +896,26 @@ The completed experiments show seven main findings:
     \item Three model families were compared per class under an identical evaluation protocol: XGBoost, a feedforward MLP, and a modern attention-based FT-Transformer. All three converge to the same per-class ceiling (Bronze $R^2 \approx 0.70$ for every model), and neither neural model beats XGBoost. This shows the limiting factor is the static feature set, not model capacity, and XGBoost is retained as the recommended model for its equal accuracy, interpretability, and far lower training cost.
 \end{itemize}
 
-\chapter{Project Plan and Timeline}
-\label{chap:timeline}
+\chapter{Limitations}
+\label{chap:limitations}
 
-This chapter outlines the structured plan and timeline for completing the capstone project. The schedule is aligned to the final submission deadline of 31st August 2026 and includes time for dataset validation, model development, evaluation, documentation, and supervisor feedback.
+This chapter states the main limitations of the work explicitly, so that the results are not over-interpreted.
 
-\section{Project Milestones}
+\section{Data Availability and Realism}
 
-The table below presents the proposed timeline of key project phases and deliverables:
+No real-world enterprise SD-WAN dataset with labelled QoS metrics was available for this project, so the work relied on public and simulator-generated data. The Zenodo 5G dataset provides real measurements but contains no Gold/Silver/Bronze QoS-class structure. The BNN-UPC dataset does provide per-class behaviour, but it is produced by a network simulator (BNNetSimulator) rather than measured on a live network. The official BNN-UPC download links were unavailable, so the dataset was generated locally using the official simulator and the same output format. CICIDS2017 was discarded because it is an intrusion-detection dataset rather than a QoS dataset, and MAWI was not used because it lacks direct QoS-class labels. The findings should therefore be read as a reproducible proof of concept, not as a claim of production-grade generalisation.
 
-\begin{table}[H]
-\centering
-\caption{Timeline and Key Deliverables}
-\label{tab:project_timeline}
-\begin{tabular}{|p{3.5cm}|p{1.8cm}|p{7.5cm}|}
-\hline
-\textbf{Time Period} & \textbf{Status} & \textbf{Activities and Deliverables} \\
-\hline
-\textbf{June 2025} & Done & Finalized project idea and submitted project proposal \\
-\hline
-\textbf{July--Nov 2025} & Done & Background research, literature review, and initial dataset exploration \\
-\hline
-\textbf{Dec 2025--Jan 2026} & Done & Finalized project scope, created GitHub repository, reviewed candidate datasets \\
-\hline
-\textbf{Feb--Mar 2026} & Done & Implemented preprocessing pipeline and baseline modelling scripts \\
-\hline
-\textbf{Apr--May 2026} & Done & Processed the Zenodo dataset, generated the BNN-UPC dataset using BNNetSimulator, trained classical ML models and a PyTorch MLP, added QoS-aware evaluation, and built the Layer 3 allocation recommender \\
-\hline
-\textbf{June 2026} & Planned & Refine the evaluation, compare MLP and XGBoost per-class behaviour, review the Layer 3 recommender results, and incorporate supervisor feedback \\
-\hline
-\textbf{July 2026} & Planned & Complete the full thesis draft, improve figures and tables, and decide whether any small additional experiment is needed \\
-\hline
-\textbf{August 2026} & Planned & Final proofreading, submit thesis by 31st August 2026, and prepare for viva \\
-\hline
-\end{tabular}
-\end{table}
+\section{Static Features and the Bronze Ceiling}
 
-\section{Tools and Resources}
+All models were trained on static configuration features (offered load, routing hops, scheduling policy, queue weights, and ToS class). These features explain Gold and Silver delay well, but they cannot capture the short-term traffic burstiness that drives Bronze delay variance, tail delay, jitter, and packet loss. This limit was confirmed empirically: three different model families, and additional engineered interaction features, all converged to the same per-class ceiling (Bronze $R^2 \approx 0.70$). The limitation is therefore one of feature observability rather than model capacity.
 
-The following tools and platforms will be used throughout the project:
-\begin{itemize}
-    \item \textbf{Programming:} Python (pandas, scikit-learn, XGBoost, PyTorch)
-    \item \textbf{Environment:} JupyterLab / VS Code
-    \item \textbf{Data Analysis:} matplotlib, seaborn
-    \item \textbf{Documentation:} Overleaf for LaTeX-based report writing
-    \item \textbf{Version Control:} GitHub (for code management and backups)
-\end{itemize}
+\section{Offline Evaluation}
 
-\section{Supervision and Checkpoints}
+The evaluation is entirely offline. The metrics used (per-class error, RMSLE, SLA-violation precision and recall, and the allocation recommender) are closer to operational SD-WAN use than a single global score, but they do not capture live behaviour such as failover, multi-path routing, or the feedback effects of acting on a prediction. Validation inside a live SD-WAN controller remains future work.
 
-Regular meetings and email check-ins with the supervisor, Dr. Jawad Manzoor, will be planned around key milestones. Ad-hoc consultation via email or MS Teams will be arranged when feedback is needed between reviews.
+\section{Computational Constraints}
 
-\chapter{Risks and Limitations}
-\label{chap:risks}
-
-This chapter outlines the potential risks and limitations associated with the proposed project, along with mitigation strategies. Identifying these factors in advance helps to set realistic expectations and provides contingency planning to ensure the project stays on track.
-
-
-\section{Data Availability}
-
-One of the primary risks is the limited availability of real-world SD-WAN traffic datasets, particularly those with labelled QoS metrics. While public datasets provide valuable traffic data, they may not directly reflect enterprise SD-WAN-specific behaviour or QoS classifications.
-
-An internal workplace dataset could not be obtained, so this project will rely on public datasets. This limitation will be explicitly discussed in the thesis to avoid over-claiming real-world SD-WAN generalisability.
-
-\textbf{Mitigation:} The project uses two public sources. The Zenodo 5G dataset is used for link capacity prediction. BNN-UPC is used for QoS scheduling and per-class delay prediction. The official BNN-UPC download links were unavailable, so the dataset was generated locally using the official BNNetSimulator environment and the same output format. CICIDS2017 was dropped because it is an intrusion detection dataset. MAWI is kept as future work because it would require extra labelling and would expand the scope too much.
-
-
-\section{Model Complexity and Training Resources}
-
-Advanced models like deep neural networks or ensemble methods may require significant computational power, especially for hyperparameter tuning and training on larger datasets.
-
-\textbf{Mitigation:} The project uses simple and explainable baselines first, including Linear Regression, SVR, Random Forest, and XGBoost. XGBoost is kept as the strongest explainable tree-based baseline. The PyTorch MLP is the main neural-network direction for future development, especially for comparing per-class allocation decisions. More complex transformer or reinforcement learning models are not treated as the main contribution.
-
-\section{Feature Engineering Challenges}
-
-Not all features listed in the methodology may be available or relevant across all datasets. Inconsistent data schemas, missing values, or incompatible units may limit the effectiveness of certain features.
-
-\textbf{Mitigation:} Separate preprocessing pipelines are used for each dataset. Zenodo features are focused on signal quality and throughput. BNN-UPC features are focused on traffic load, routing hops, ToS class, scheduling policy, and queue weight. This avoids forcing different datasets into one artificial schema.
-
-\section{Evaluation in Real-World Context}
-
-Since the proposed work is likely to use offline datasets, the final results may not directly translate to real-time SD-WAN deployment without further validation. Simulations might not capture dynamic, production-grade behaviors such as live failovers or multi-path routing decisions.
-
-\textbf{Mitigation:} The project focuses on a reproducible proof of concept using offline data. The evaluation includes class-aware metrics, scenario-specific slicing, RMSLE, and SLA violation precision. These metrics are closer to operational SD-WAN use than a single global regression score, but live controller validation remains future work.
-
-\section{Time Constraints}
-
-Any delays in data access, tool setup, or model convergence could impact the final delivery timeline.
-
-\textbf{Mitigation:} A flexible and modular project plan has been developed, with early-stage tasks front-loaded to reduce later risk. Regular checkpoints with the supervisor will help track progress and address blockers quickly.
+Model training and tuning were carried out on a single laptop without dedicated GPU acceleration. This limited the extent of neural-network hyper-parameter search and the size of the simulated dataset. Because the tree-based and neural models reached the same per-class ceiling, this constraint is unlikely to have changed the main conclusions, but a larger compute budget would allow a wider search and more simulated data.
 
 \chapter{Conclusion}
 \label{chap:conclusion}
@@ -948,9 +924,9 @@ This thesis investigated the use of machine learning models to predict Quality o
 
 The literature review identified a broad range of AI and ML techniques applied to QoS prediction and SD-WAN traffic engineering, ranging from classical supervised learning to graph neural networks and reinforcement learning. The review confirmed that while deep learning and transformer-based models represent the current state of the art, interpretable baseline models remain essential as comparison benchmarks and are computationally feasible for near-real-time deployment.
 
-The first dataset is the Zenodo 5G campus network dataset. It is useful for predicting link capacity from radio and traffic features. On this dataset, tree-based and kernel models perform strongly, with Random Forest and XGBoost achieving test $R^2$ values around 0.98. This shows that the measured link conditions contain a strong signal for throughput prediction.
+The first dataset is the Zenodo 5G campus network dataset. It is useful for predicting link capacity from radio and traffic features. On this dataset, tree-based and kernel models perform strongly, with Random Forest and XGBoost reaching a held-out test $R^2$ of about 0.98 (cross-validated $R^2 \approx 0.94$). This shows that the measured link conditions contain a strong signal for throughput prediction.
 
-The second dataset is the BNN-UPC dataset generated using BNNetSimulator. This dataset is more important for the original research question because it includes Gold, Silver, and Bronze traffic classes under different scheduling policies and queue weights. On log-transformed average delay, XGBoost and the PyTorch MLP both achieve strong global results, with cross-validation $R^2$ around 0.77. XGBoost is useful because it is easier to explain, while the MLP is important because it represents the neural-network direction of the project.
+The second dataset is the BNN-UPC dataset generated using BNNetSimulator. This dataset is more important for the original research question because it includes Gold, Silver, and Bronze traffic classes under different scheduling policies and queue weights. On log-transformed average delay all evaluated models reach a similar global score (cross-validated $R^2 \approx 0.77$). A per-class comparison of three model families, XGBoost, a feedforward MLP, and an FT-Transformer, showed that they converge to almost identical per-class performance, and neither neural model beat XGBoost. XGBoost is therefore retained as the recommended model because it matches the neural models while remaining interpretable and far cheaper to train.
 
 The QoS-aware evaluation is a key part of the work. It shows that a single global score is not enough. Gold and Silver delay are predicted with low error, while Bronze is more difficult because its delay is more volatile and heavy-tailed. SLA violation precision is especially strong for Gold traffic, which is useful because Gold flows are normally the most important class for SD-WAN policy decisions.
 
@@ -958,9 +934,9 @@ The Layer 3 allocation recommender uses the trained BNN-UPC delay model to compa
 
 \section{Real-World Impact or Benefit}
 
-The core value of this project lies in enabling proactive Quality of Service (QoS) management in SD-WAN environments through AI-driven predictions. In current networks, QoS violations are often addressed reactively, after user experience is already affected. This project aims to change that by predicting issues in advance using real-time flow-level features.
+The core value of this project lies in supporting proactive Quality of Service (QoS) management in SD-WAN environments through AI-driven predictions. In current networks, QoS violations are often addressed reactively, after user experience is already affected. This work is a step in that direction: it predicts per-class QoS behaviour from network configuration features offline, as a proof of concept that could later be driven by live telemetry.
 
-\textbf{Practical Benefits in Real Networks:}
+\textbf{Potential benefits, if integrated into a live system:}
 \begin{itemize}
     \item \textbf{Proactive Network Management:} Helps operators act before congestion or SLA violations occur.
     \item \textbf{Cost Optimization:} Enables more informed bandwidth allocation and may reduce unnecessary overprovisioning.
