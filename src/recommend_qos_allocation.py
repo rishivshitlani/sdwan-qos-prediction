@@ -24,42 +24,26 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
+from sdwan_qos.config import (
+    ALLOCATION_SLA_MS,
+    BNNUPC_LEAKAGE_COLUMNS,
+    BNNUPC_PROCESSED_DATASET,
+    QOS_ORDER,
+    REPORTS_DIR,
+    SLA_PENALTY_WEIGHTS,
+    TOS_TO_CLASS,
+)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_qos_allocation_recommendations.csv"
+
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_OUTPUT_PATH = REPORTS_DIR / "bnnupc_qos_allocation_recommendations.csv"
 TARGET_COLUMN = "log_avg_delay"
-QOS_ORDER = ["Gold", "Silver", "Bronze"]
-TOS_TO_CLASS = {0: "Gold", 1: "Silver", 2: "Bronze"}
-CLASS_TO_TOS = {v: k for k, v in TOS_TO_CLASS.items()}
 DEFAULT_PROFILES = [
     "60,30,10",
     "50,40,10",
     "33,33,34",
     "25,65,10",
     "80,15,5",
-]
-DEFAULT_SLA_MS = {
-    "Gold": 20.0,
-    "Silver": 50.0,
-    "Bronze": 100.0,
-}
-SLA_PENALTY_WEIGHTS = {
-    "Gold": 3.0,
-    "Silver": 2.0,
-    "Bronze": 1.0,
-}
-
-BNNUPC_DROP_COLUMNS = [
-    "simulation_id",
-    "scenario",
-    "avg_delay",
-    "jitter",
-    "packet_loss_rate",
-    "delay_p10",
-    "delay_p50",
-    "delay_p90",
-    "actual_bandwidth",
 ]
 
 
@@ -105,7 +89,7 @@ def load_bnnupc_dataset(input_path: Path) -> pd.DataFrame:
 
 
 def split_features_and_target(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    columns_to_drop = [c for c in [TARGET_COLUMN, *BNNUPC_DROP_COLUMNS] if c in data.columns]
+    columns_to_drop = [c for c in [TARGET_COLUMN, *BNNUPC_LEAKAGE_COLUMNS] if c in data.columns]
     features = data.drop(columns=columns_to_drop)
     target = pd.to_numeric(data[TARGET_COLUMN], errors="coerce")
     mask = target.notna()
@@ -167,7 +151,7 @@ def parse_profiles(values: list[str]) -> list[dict[str, float]]:
 
 def parse_sla_thresholds(value: str) -> dict[str, float]:
     if not value:
-        return DEFAULT_SLA_MS.copy()
+        return ALLOCATION_SLA_MS.copy()
     parts = [float(part.strip()) for part in value.split(",") if part.strip()]
     if len(parts) != 3:
         raise argparse.ArgumentTypeError("--sla-ms must contain Gold,Silver,Bronze thresholds.")

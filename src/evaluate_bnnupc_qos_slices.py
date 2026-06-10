@@ -30,38 +30,25 @@ from sklearn.metrics import (
 from sklearn.model_selection import KFold
 from sklearn.pipeline import Pipeline
 
+from sdwan_qos.config import (
+    BNNUPC_LEAKAGE_COLUMNS,
+    BNNUPC_PROCESSED_DATASET,
+    EVAL_SLA_MS,
+    QOS_ORDER,
+    REPORTS_DIR,
+)
 from train_baseline import build_model_specs, build_preprocessor
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_SLICE_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_qos_slice_evaluation.csv"
-DEFAULT_SLA_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_sla_violation_precision.csv"
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_SLICE_OUTPUT_PATH = REPORTS_DIR / "bnnupc_qos_slice_evaluation.csv"
+DEFAULT_SLA_OUTPUT_PATH = REPORTS_DIR / "bnnupc_sla_violation_precision.csv"
 TARGET_COLUMN = "log_avg_delay"
-QOS_ORDER = ["Gold", "Silver", "Bronze"]
-DEFAULT_SLA_MS = {
-    "Gold": 30.0,
-    "Silver": 50.0,
-    # Bronze tuned from 100 ms to 60 ms (reproduce with --bronze-sweep): improves
-    # recall 0.368 -> 0.568 while staying strictly more lenient than Silver (50 ms).
-    "Bronze": 60.0,
-}
 # Bronze thresholds explored by the sensitivity sweep that motivated the 60 ms
-# default. Running with --bronze-sweep reproduces the threshold table reported
-# in the thesis from a single deterministic out-of-fold prediction run.
+# default in EVAL_SLA_MS. Running with --bronze-sweep reproduces the threshold
+# table reported in the thesis from a single deterministic out-of-fold run.
 DEFAULT_BRONZE_SWEEP = [100.0, 70.0, 60.0, 50.0]
-DEFAULT_SWEEP_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_bronze_threshold_sweep.csv"
-BNNUPC_DROP_COLUMNS = [
-    "simulation_id",
-    "scenario",
-    "avg_delay",
-    "jitter",
-    "packet_loss_rate",
-    "delay_p10",
-    "delay_p50",
-    "delay_p90",
-    "actual_bandwidth",
-]
+DEFAULT_SWEEP_OUTPUT_PATH = REPORTS_DIR / "bnnupc_bronze_threshold_sweep.csv"
 
 
 def parse_sla_thresholds(value: str) -> dict[str, float]:
@@ -97,7 +84,7 @@ def load_bnnupc_dataset(input_path: Path) -> pd.DataFrame:
 
 
 def split_features_and_target(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    columns_to_drop = [c for c in [TARGET_COLUMN, *BNNUPC_DROP_COLUMNS] if c in data.columns]
+    columns_to_drop = [c for c in [TARGET_COLUMN, *BNNUPC_LEAKAGE_COLUMNS] if c in data.columns]
     features = data.drop(columns=columns_to_drop)
     target = pd.to_numeric(data[TARGET_COLUMN], errors="coerce")
     mask = target.notna()
@@ -375,7 +362,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sla-ms",
         type=parse_sla_thresholds,
-        default=parse_sla_thresholds("30,50,60"),
+        default=EVAL_SLA_MS,
         help="SLA violation thresholds in milliseconds as Gold,Silver,Bronze.",
     )
     parser.add_argument(

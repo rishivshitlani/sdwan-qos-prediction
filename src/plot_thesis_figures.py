@@ -8,24 +8,24 @@ deliberately plain (no frills) to match the project guidelines.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RESULTS = PROJECT_ROOT / "reports" / "model_results"
+from sdwan_qos.config import EVAL_SLA_MS, PROJECT_ROOT, QOS_ORDER, REPORTS_DIR
+
+RESULTS = REPORTS_DIR
 FIGDIR = PROJECT_ROOT / "MSc AI-DA-AI Online Thesis Document" / "Figures"
 
 MODEL_ORDER = ["XGBRegressor", "PyTorchMLP", "FTTransformer"]
 MODEL_LABELS = {"XGBRegressor": "XGBoost", "PyTorchMLP": "MLP", "FTTransformer": "FT-Transformer"}
-CLASS_ORDER = ["Gold", "Silver", "Bronze"]
+CLASS_ORDER = QOS_ORDER
 # Muted, print-friendly palette (also distinguishable in greyscale).
 MODEL_COLORS = {"XGBRegressor": "#4C72B0", "PyTorchMLP": "#DD8452", "FTTransformer": "#55A868"}
-TUNED_SLA = {"Gold": 30.0, "Silver": 50.0, "Bronze": 60.0}
+# Figures must select rows at the same tuned thresholds the evaluators wrote.
+TUNED_SLA = EVAL_SLA_MS
 
 
 def _style(ax) -> None:

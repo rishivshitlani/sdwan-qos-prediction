@@ -42,17 +42,17 @@ from typing import NamedTuple
 import networkx as nx
 import yaml
 
+# TOS_TO_CLASS and LINK_BANDWIDTH are shared with process_bnnupc_dataset.py:
+# both stages must agree or the processed dataset is mislabelled.
+from sdwan_qos.config import LINK_BANDWIDTH, RAW_DATA_DIR, TOS_TO_CLASS
+
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "raw" / "BNN_UPC" / "sim_input"
+DEFAULT_OUTPUT_DIR = RAW_DATA_DIR / "BNN_UPC" / "sim_input"
 DATASET_NAME = "qos_sdwan"
-
-# ToS → QoS class label (used only in comments / post-processing)
-TOS_TO_CLASS = {0: "Gold", 1: "Silver", 2: "Bronze"}
 
 # WFQ weight profiles for each scheduling scenario (Gold/Silver/Bronze %)
 WFQ_PROFILES = [
@@ -86,7 +86,7 @@ TOS_PROBS_EQUAL  = [0.333, 0.333, 0.334] # Scenario D: equiprobable
 PKT_DIST_SMALL = "0,300,0.5,1700,0.5"     # generic: 300-bit or 1700-bit pkts
 PKT_DIST_LARGE = "0,500,0.4,1000,0.3,1400,0.3"  # generic: 500/1000/1400-bit
 
-LINK_BANDWIDTH = 100_000  # bits/time-unit (matches ch20)
+# LINK_BANDWIDTH (bits/time-unit, matches ch20) is imported from sdwan_qos.config.
 # Larger buffers preserve the expected protection for high-priority queues.
 # Packet-loss evaluation is therefore restricted to Bronze.
 BUFFER_SIZE    = 32_000   # bits

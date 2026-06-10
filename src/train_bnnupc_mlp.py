@@ -24,24 +24,17 @@ from sklearn.model_selection import KFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from sdwan_qos.config import (
+    BNNUPC_LEAKAGE_COLUMNS,
+    BNNUPC_PROCESSED_DATASET,
+    REPORTS_DIR,
+)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_mlp_log_delay_results.csv"
+
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_OUTPUT_PATH = REPORTS_DIR / "bnnupc_mlp_log_delay_results.csv"
 TARGET_COLUMN = "log_avg_delay"
 DATASET_NAME = "bnnupc_qos"
-
-BNNUPC_DROP_COLUMNS = [
-    "simulation_id",
-    "scenario",
-    "avg_delay",
-    "jitter",
-    "packet_loss_rate",
-    "delay_p10",
-    "delay_p50",
-    "delay_p90",
-    "actual_bandwidth",
-]
 
 
 def build_one_hot_encoder() -> OneHotEncoder:
@@ -349,7 +342,7 @@ def train_bnnupc_mlp(
     patience: int,
     device_name: str,
 ) -> pd.DataFrame:
-    features, target = load_features_and_target(input_path, TARGET_COLUMN, BNNUPC_DROP_COLUMNS)
+    features, target = load_features_and_target(input_path, TARGET_COLUMN, BNNUPC_LEAKAGE_COLUMNS)
 
     x_train, x_test, y_train, y_test = train_test_split(
         features,

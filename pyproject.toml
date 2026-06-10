@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sdwan-qos-prediction"
+version = "0.1.0"
+description = "AI-driven QoS prediction in SD-WAN networks (MSc AI capstone, University of Galway)"
+requires-python = ">=3.10"
+# Pinned to the versions verified in the project virtual environment so thesis
+# results stay reproducible. Update deliberately, then re-run the evaluations.
+dependencies = [
+    "pandas==3.0.2",
+    "numpy==2.4.4",
+    "scikit-learn==1.8.0",
+    "matplotlib==3.10.9",
+    "seaborn==0.13.2",
+    "xgboost==3.2.0",
+    "torch==2.12.0",
+    "joblib==1.5.3",
+    "openpyxl==3.1.5",
+    "networkx==3.6.1",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter==1.1.1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["sdwan_qos"]

@@ -28,7 +28,6 @@ from train_bnnupc_ft_transformer import (
     transform,
 )
 from evaluate_bnnupc_qos_slices import (
-    DEFAULT_SLA_MS,
     append_results_csv,
     build_sla_rows,
     build_slice_rows,
@@ -37,12 +36,12 @@ from evaluate_bnnupc_qos_slices import (
     parse_sla_thresholds,
     split_features_and_target,
 )
+from sdwan_qos.config import BNNUPC_PROCESSED_DATASET, EVAL_SLA_MS, REPORTS_DIR
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_SLICE_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_qos_slice_evaluation.csv"
-DEFAULT_SLA_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_sla_violation_precision.csv"
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_SLICE_OUTPUT_PATH = REPORTS_DIR / "bnnupc_qos_slice_evaluation.csv"
+DEFAULT_SLA_OUTPUT_PATH = REPORTS_DIR / "bnnupc_sla_violation_precision.csv"
 MODEL_NAME = "FTTransformer"
 
 
@@ -112,7 +111,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sla-output-path", type=Path, default=DEFAULT_SLA_OUTPUT_PATH)
     parser.add_argument("--cv-folds", type=int, default=5)
     parser.add_argument("--random-state", type=int, default=42)
-    parser.add_argument("--sla-ms", type=parse_sla_thresholds, default=DEFAULT_SLA_MS)
+    parser.add_argument("--sla-ms", type=parse_sla_thresholds, default=EVAL_SLA_MS)
     parser.add_argument("--val-size", type=float, default=0.10)
     parser.add_argument("--d-token", type=int, default=64)
     parser.add_argument("--n-blocks", type=int, default=3)
@@ -130,7 +129,7 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    sla_ms = args.sla_ms if isinstance(args.sla_ms, dict) else DEFAULT_SLA_MS
+    sla_ms = args.sla_ms if isinstance(args.sla_ms, dict) else EVAL_SLA_MS
     hp = {
         "d_token": args.d_token, "n_blocks": args.n_blocks, "n_heads": args.n_heads,
         "ffn_factor": args.ffn_factor, "dropout": args.dropout,

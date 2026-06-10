@@ -35,8 +35,6 @@ from train_bnnupc_mlp import (
 # Reuse the metric/reporting functions so XGBoost and MLP reports share schema
 # and computation. This is what makes the comparison fair.
 from evaluate_bnnupc_qos_slices import (
-    DEFAULT_SLA_MS,
-    QOS_ORDER,  # noqa: F401
     append_results_csv,
     build_sla_rows,
     build_slice_rows,
@@ -45,12 +43,12 @@ from evaluate_bnnupc_qos_slices import (
     parse_sla_thresholds,
     split_features_and_target,
 )
+from sdwan_qos.config import BNNUPC_PROCESSED_DATASET, EVAL_SLA_MS, REPORTS_DIR
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_SLICE_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_qos_slice_evaluation.csv"
-DEFAULT_SLA_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_sla_violation_precision.csv"
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_SLICE_OUTPUT_PATH = REPORTS_DIR / "bnnupc_qos_slice_evaluation.csv"
+DEFAULT_SLA_OUTPUT_PATH = REPORTS_DIR / "bnnupc_sla_violation_precision.csv"
 MODEL_NAME = "PyTorchMLP"
 
 
@@ -228,7 +226,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sla-ms",
         type=parse_sla_thresholds,
-        default=DEFAULT_SLA_MS,
+        default=EVAL_SLA_MS,
         help="SLA violation thresholds in milliseconds as Gold,Silver,Bronze.",
     )
     # MLP hyperparameters mirror train_bnnupc_mlp.py defaults for a faithful comparison.
@@ -246,7 +244,7 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    sla_ms = args.sla_ms if isinstance(args.sla_ms, dict) else DEFAULT_SLA_MS
+    sla_ms = args.sla_ms if isinstance(args.sla_ms, dict) else EVAL_SLA_MS
     print(f"Evaluating {MODEL_NAME} with {args.cv_folds}-fold out-of-fold predictions...")
     slice_results, sla_results = evaluate_bnnupc_mlp_slices(
         input_path=args.input_path,

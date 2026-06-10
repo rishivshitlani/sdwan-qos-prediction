@@ -38,14 +38,19 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_RESULTS_DIR  = PROJECT_ROOT / "data" / "raw" / "BNN_UPC" / "sim_input" / "results" / "qos_sdwan"
-DEFAULT_GRAPHS_DIR   = PROJECT_ROOT / "data" / "raw" / "BNN_UPC" / "sim_input" / "graphs"
-DEFAULT_ROUTINGS_DIR = PROJECT_ROOT / "data" / "raw" / "BNN_UPC" / "sim_input" / "routings"
-DEFAULT_OUTPUT_PATH  = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
+# TOS_TO_CLASS and LINK_BANDWIDTH are shared with generate_bnnupc_dataset.py:
+# both stages must agree or the processed dataset is mislabelled.
+from sdwan_qos.config import (
+    BNNUPC_PROCESSED_DATASET,
+    LINK_BANDWIDTH,
+    RAW_DATA_DIR,
+    TOS_TO_CLASS,
+)
 
-TOS_TO_CLASS = {0: "Gold", 1: "Silver", 2: "Bronze"}
-LINK_BANDWIDTH = 100_000  # bits/time-unit (fixed in generate script)
+DEFAULT_RESULTS_DIR  = RAW_DATA_DIR / "BNN_UPC" / "sim_input" / "results" / "qos_sdwan"
+DEFAULT_GRAPHS_DIR   = RAW_DATA_DIR / "BNN_UPC" / "sim_input" / "graphs"
+DEFAULT_ROUTINGS_DIR = RAW_DATA_DIR / "BNN_UPC" / "sim_input" / "routings"
+DEFAULT_OUTPUT_PATH  = BNNUPC_PROCESSED_DATASET
 
 # Fields in each simulationResults path entry (semicolon-separated)
 SIM_FIELDS = [

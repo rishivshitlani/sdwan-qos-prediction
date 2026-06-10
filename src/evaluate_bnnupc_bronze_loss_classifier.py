@@ -19,29 +19,22 @@ from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_sco
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 
+from sdwan_qos.config import (
+    BNNUPC_LEAKAGE_COLUMNS,
+    BNNUPC_PROCESSED_DATASET,
+    REPORTS_DIR,
+)
 from train_baseline import build_preprocessor
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_bronze_loss_classifier.csv"
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_OUTPUT_PATH = REPORTS_DIR / "bnnupc_bronze_loss_classifier.csv"
 TARGET_COLUMN = "packet_loss_rate"
 QOS_CLASS = "Bronze"
 
-DROP_COLUMNS = [
-    "simulation_id",
-    "scenario",
-    "tos",
-    "qos_class",
-    "avg_delay",
-    "jitter",
-    "packet_loss_rate",
-    "delay_p10",
-    "delay_p50",
-    "delay_p90",
-    "actual_bandwidth",
-    "log_avg_delay",
-]
+# Beyond the shared leakage list, drop the class identifiers (constant for a
+# Bronze-only dataset) and the log-delay target from the other experiments.
+DROP_COLUMNS = [*BNNUPC_LEAKAGE_COLUMNS, "tos", "qos_class", "log_avg_delay"]
 
 
 def load_bronze_features(input_path: Path) -> tuple[pd.DataFrame, pd.Series]:

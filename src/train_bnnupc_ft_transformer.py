@@ -32,18 +32,17 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, train_test_split
 
+from sdwan_qos.config import (
+    BNNUPC_LEAKAGE_COLUMNS,
+    BNNUPC_PROCESSED_DATASET,
+    REPORTS_DIR,
+)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_ft_transformer_log_delay_results.csv"
+
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_OUTPUT_PATH = REPORTS_DIR / "bnnupc_ft_transformer_log_delay_results.csv"
 TARGET_COLUMN = "log_avg_delay"
 DATASET_NAME = "bnnupc_qos"
-
-# Outcome / identifier columns dropped from the feature set (same as MLP/XGBoost).
-BNNUPC_DROP_COLUMNS = [
-    "simulation_id", "scenario", "avg_delay", "jitter", "packet_loss_rate",
-    "delay_p10", "delay_p50", "delay_p90", "actual_bandwidth",
-]
 
 # Feature typing for the tokenizer. Small-cardinality codes (tos, time_distribution)
 # and labels (qos_class, scheduling_policy) get embeddings; the rest are numeric.
@@ -65,7 +64,7 @@ def load_features_and_target(input_path: Path) -> tuple[pd.DataFrame, pd.Series]
     data.columns = data.columns.astype(str).str.strip()
     if TARGET_COLUMN not in data.columns:
         raise ValueError(f"Target column '{TARGET_COLUMN}' not found in {input_path}")
-    drop = [c for c in [TARGET_COLUMN, *BNNUPC_DROP_COLUMNS] if c in data.columns]
+    drop = [c for c in [TARGET_COLUMN, *BNNUPC_LEAKAGE_COLUMNS] if c in data.columns]
     features = data.drop(columns=drop)
     target = pd.to_numeric(data[TARGET_COLUMN], errors="coerce")
     mask = target.notna()

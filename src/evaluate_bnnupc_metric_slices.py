@@ -30,26 +30,24 @@ from sklearn.metrics import (
 from sklearn.model_selection import KFold
 from sklearn.pipeline import Pipeline
 
+from sdwan_qos.config import (
+    BNNUPC_IDENTIFIER_COLUMNS,
+    BNNUPC_OUTCOME_COLUMNS,
+    BNNUPC_PROCESSED_DATASET,
+    QOS_ORDER,
+    REPORTS_DIR,
+)
 from train_baseline import build_model_specs, build_preprocessor
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
-DEFAULT_SLICE_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_metric_slice_evaluation.csv"
-DEFAULT_SLA_OUTPUT_PATH = PROJECT_ROOT / "reports" / "model_results" / "bnnupc_metric_sla_precision.csv"
+DEFAULT_INPUT_PATH = BNNUPC_PROCESSED_DATASET
+DEFAULT_SLICE_OUTPUT_PATH = REPORTS_DIR / "bnnupc_metric_slice_evaluation.csv"
+DEFAULT_SLA_OUTPUT_PATH = REPORTS_DIR / "bnnupc_metric_sla_precision.csv"
 DEFAULT_TARGETS = ["jitter", "delay_p90"]
-QOS_ORDER = ["Gold", "Silver", "Bronze"]
-OUTCOME_COLUMNS = [
-    "avg_delay",
-    "log_avg_delay",
-    "jitter",
-    "packet_loss_rate",
-    "delay_p10",
-    "delay_p50",
-    "delay_p90",
-    "actual_bandwidth",
-]
-IDENTIFIER_COLUMNS = ["simulation_id", "scenario"]
+# Every measured outcome is excluded from X here, including the derived
+# log_avg_delay, because this evaluator predicts other QoS targets.
+OUTCOME_COLUMNS = [*BNNUPC_OUTCOME_COLUMNS, "log_avg_delay"]
+IDENTIFIER_COLUMNS = BNNUPC_IDENTIFIER_COLUMNS
 
 
 def parse_sla_thresholds(value: str) -> dict[str, float]:
