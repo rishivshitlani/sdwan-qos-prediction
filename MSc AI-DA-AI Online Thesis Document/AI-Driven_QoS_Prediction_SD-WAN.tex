@@ -23,6 +23,18 @@
 \usepackage[pdftex]{graphicx}
 \usepackage[utf8]{inputenc}
 
+% TikZ for the architecture, workflow, and deployment diagrams.
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+% Reusable node styles for clean, greyscale-friendly flow diagrams.
+\tikzset{
+  block/.style   = {rectangle, draw, rounded corners, align=center,
+                    minimum height=1.0cm, minimum width=2.6cm, inner sep=5pt},
+  ioblock/.style = {block, fill=black!5},
+  layerblock/.style = {block, fill=black!8, minimum width=3.2cm},
+  flowarrow/.style = {-{Latex[length=2.2mm]}, thick},
+}
+
 %\usepackage{layout}
 
 \linespread{1.5}
@@ -139,7 +151,20 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     \subsection*{Scope and Context}
     
-    This thesis explores how AI and ML techniques can be used to predict QoS in SD-WAN-like networks. The project began with a broad focus on QoS prediction, but the implemented work now has three connected layers. Layer 1 predicts link capacity using the Zenodo 5G dataset. Layer 2 predicts per-class delay using a BNN-UPC/BNNetSimulator dataset, using XGBoost as the strongest explainable tree-based baseline and comparing it against two neural models: a feedforward MLP and an FT-Transformer. Layer 3 uses the delay model to recommend a WFQ bandwidth allocation for Gold, Silver, and Bronze traffic.
+    This thesis explores how AI and ML techniques can be used to predict QoS in SD-WAN-like networks. The project began with a broad focus on QoS prediction, but the implemented work now has three connected layers. Layer 1 predicts link capacity using the Zenodo 5G dataset. Layer 2 predicts per-class delay using a BNN-UPC/BNNetSimulator dataset, using XGBoost as the strongest explainable tree-based baseline and comparing it against two neural models: a feedforward MLP and an FT-Transformer. Layer 3 uses the delay model to recommend a WFQ bandwidth allocation for Gold, Silver, and Bronze traffic. Figure~\ref{fig:architecture} shows this layered architecture and how the layers connect.
+
+    \begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[node distance=0.9cm]
+      \node[layerblock] (l1) {\textbf{Layer 1: Link-capacity prediction}\\[2pt] Zenodo 5G data $\rightarrow$ predicted throughput};
+      \node[layerblock, below=of l1] (l2) {\textbf{Layer 2: Per-class QoS prediction}\\[2pt] BNN-UPC data $\rightarrow$ Gold/Silver/Bronze delay\\ (XGBoost, MLP, FT-Transformer)};
+      \node[layerblock, below=of l2] (l3) {\textbf{Layer 3: Allocation recommendation}\\[2pt] rank WFQ profiles $\rightarrow$ recommended split\\ (with SLA feasibility flag)};
+      \draw[flowarrow] (l1) -- (l2);
+      \draw[flowarrow] (l2) -- (l3);
+    \end{tikzpicture}
+    \caption{The three-layer architecture of the thesis. Each layer produces an output consumed by the next: link-capacity prediction sets the context, per-class delay prediction is the core modelling task, and the allocation recommender turns predictions into a bandwidth-allocation decision.}
+    \label{fig:architecture}
+    \end{figure}
     
     \subsection*{Problem Statement}
     
@@ -407,6 +432,31 @@ The project uses a layered methodology:
 \end{itemize}
 
 All data-generation, preprocessing, modelling, and evaluation code, together with the generated BNN-UPC dataset, is available in the project's public code repository.\footnote{Code and generated data: \url{https://github.com/rishivshitlani/sdwan-qos-prediction}.}
+
+Figure~\ref{fig:workflow} summarises the end-to-end experimental workflow that produces the results in Chapter~\ref{chap:results}. The same pipeline is applied to both datasets, with only the feature set and target changing between them.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.55cm and 0.7cm]
+  \node[ioblock] (data) {Datasets\\(Zenodo, BNN-UPC)};
+  \node[block, right=of data] (clean) {Cleaning \&\\leakage removal};
+  \node[block, right=of clean] (feat) {Feature\\engineering};
+  \node[block, below=of feat] (train) {Model training\\(XGBoost / MLP /\\FT-Transformer)};
+  \node[block, left=of train] (cv) {Out-of-fold\\cross-validation};
+  \node[block, left=of cv] (pred) {Per-row\\predictions};
+  \node[block, below=of pred] (eval) {QoS-aware\\evaluation};
+  \node[ioblock, right=of eval] (rec) {Allocation\\recommendation};
+  \draw[flowarrow] (data) -- (clean);
+  \draw[flowarrow] (clean) -- (feat);
+  \draw[flowarrow] (feat) -- (train);
+  \draw[flowarrow] (train) -- (cv);
+  \draw[flowarrow] (cv) -- (pred);
+  \draw[flowarrow] (pred) -- (eval);
+  \draw[flowarrow] (eval) -- (rec);
+\end{tikzpicture}
+\caption{End-to-end experimental workflow, from raw datasets to the allocation recommendation. Leakage columns are removed before feature engineering; models are compared under an identical out-of-fold cross-validation protocol; and the resulting per-row predictions feed both the QoS-aware evaluation and the Layer~3 recommender.}
+\label{fig:workflow}
+\end{figure}
 
 \section{Dataset Selection}
 
@@ -970,6 +1020,29 @@ The default SLA thresholds for this allocation experiment were Gold $<$ 20 ms, S
 \end{table}
 
 No tested profile fully satisfies the strict Gold threshold of 20 ms. The recommender therefore selects 60/30/10 as the least-violating profile. This is still useful because the system can show both a recommendation and an infeasibility warning. In practice, this could tell an SD-WAN controller that changing WFQ weights alone may not be enough and that rerouting or extra capacity may be needed. A future comparison should run the same profile search using the PyTorch MLP and check whether the neural model recommends the same allocation.
+
+\subsection{Towards a Deployment Architecture}
+\label{sec:deployment}
+
+The recommender in this thesis runs offline on a fixed dataset, but its design maps onto a realistic closed-loop control system for a production SD-WAN. Figure~\ref{fig:deployment} sketches how the components would fit together. The SD-WAN controller continuously collects telemetry (per-flow delay, loss, and offered load) from the edge routers. This telemetry is fed to the trained QoS model, which predicts per-class delay under the current conditions. The recommender then evaluates candidate WFQ profiles using the model as a surrogate and returns either a recommended profile or an infeasibility signal. Finally, the controller enacts the decision: it pushes the new QoS policy to the edge routers when a feasible profile exists, or escalates to a different control action (rerouting or adding capacity) when none does. The loop then repeats as new telemetry arrives.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.2cm and 1.7cm]
+  \node[block] (ctrl) {SD-WAN\\controller};
+  \node[block, dashed, right=of ctrl] (model) {QoS prediction\\model};
+  \node[block, dashed, right=of model] (rec) {Allocation\\recommender};
+  \node[ioblock, below=of model] (edge) {Edge routers\\(telemetry \& enforcement)};
+  \draw[flowarrow] (edge.west) -| node[near start, above] {\footnotesize telemetry} (ctrl.south);
+  \draw[flowarrow] (ctrl) -- node[above] {\footnotesize features} (model);
+  \draw[flowarrow] (model) -- node[above] {\footnotesize delay} (rec);
+  \draw[flowarrow] (rec.south) |- node[near end, above] {\footnotesize new QoS policy} (edge.east);
+\end{tikzpicture}
+\caption{A closed-loop deployment architecture for the recommender. Edge-router telemetry feeds the controller, which drives the prediction model and recommender; the resulting policy (or an escalation when no profile is feasible) is pushed back to the edge routers, and the loop repeats. The dashed offline components of this thesis correspond to the ``QoS prediction model'' and ``allocation recommender'' blocks.}
+\label{fig:deployment}
+\end{figure}
+
+Two properties of the design are worth noting. First, the model must be cheap enough to run inside this loop, which reinforces the choice of XGBoost: it infers in milliseconds and retrains in seconds, unlike the neural models. Second, the infeasibility signal is what makes the loop safe: rather than silently applying a profile that cannot meet the SLA, the system tells the controller to escalate, so that the automation fails loudly rather than degrading service quietly.
 
 \section{Summary of Findings}
 
