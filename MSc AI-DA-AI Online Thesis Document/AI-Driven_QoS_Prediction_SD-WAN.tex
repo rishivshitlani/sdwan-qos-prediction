@@ -314,9 +314,11 @@ These studies clearly support RQ1 by showing that supervised learning and deep l
 
 Although the above techniques work well in controlled settings, there are challenges when using them in real networks. For example, the deep reinforcement learning (DRL) model by Dinh et al. (2024) ~\cite{dinh2024safeloadbalancing} well in simulations and maintains safe traffic routing using control barrier functions (CBFs). However, DRL requires a lot of training time and GPU support, which may not be available in all SD-WAN deployments.
 
-In contrast, Quang et al. (2023) ~\cite{quang2023globalqos} proposed SABE which is a lightweight method that uses queuing theory to estimate how much bandwidth is left on a link without sending test traffic. This approach avoids complex AI models but may be less flexible when traffic patterns become unpredictable.
+In contrast, Quang et al. (2023)~\cite{quang2023globalqos} take an analytical rather than a learned approach. Their central contribution is SABE, a bandwidth estimator that infers how much capacity is actually free on each overlay link \emph{without sending probe traffic}. SABE models each link as an M/M/1/K queue and inverts the standard queuing-theory equations for delay and loss: because SD-WAN routers already report measured delay and loss, these measurements are used to recover the total load on the link, and subtracting the SD-WAN's own traffic yields the hidden cross-traffic and hence the available bandwidth. This estimate then feeds a two-loop controller: a slower loop optimises routing (path split ratios) and a faster loop tunes per-class QoS policies (queue weights and shaper rates) using a lightweight local-search optimiser instead of a slow exact solver. Traffic is grouped into four classes (Critical, VoIP, Office, Bulk), each with its own delay and loss target.
 
-This contrast shows that while AI models are powerful, their complexity and resource requirements must be carefully considered before deployment, which directly addresses RQ2.
+In their NS-3 simulation, combining routing optimisation, QoS optimisation, and SABE raised SLA satisfaction for critical traffic by roughly 40\% over static policies, with the bandwidth estimate doing most of the work: optimisation alone moved critical-class satisfaction from about 55\% to 64\%, while adding SABE pushed it to about 98\%. The local-search optimiser matched the exact solver almost exactly (97.7\% versus 97.8\%) at much lower cost.
+
+This work is directly relevant to the present thesis, but it is important to note what it is \emph{not}: SABE is a fixed, model-based estimator, not a learned one. Its accuracy rests on the M/M/1/K assumption of Poisson arrivals and exponential service times, which does not describe the bursty, self-similar traffic of real WANs; this is precisely the assumption a data-driven model could relax. SABE therefore serves as a strong non-learned baseline that motivates the machine-learning direction taken here. More generally, this contrast shows that AI models are powerful but their complexity and resource requirements must be weighed against simpler analytical methods before deployment, which directly addresses RQ2.
 
 \section{Integration into SD-WAN Systems (RQ3)}
 
@@ -345,7 +347,7 @@ Zheng et al.~\cite{zheng2022applicationaware} & SDN simulation & DNN + ILP & Cla
 \hline
 Dinh et al.~\cite{dinh2024safeloadbalancing} & Simulation & DRL (PPO/DDPG) & Control-focused; heavy compute; no interpretable prediction \\
 \hline
-Quang et al.~\cite{quang2023globalqos} & Analytical & Queuing theory (SABE) & Single metric (bandwidth); not learned; no QoS classes \\
+Quang et al.~\cite{quang2023globalqos} & NS-3 sim. & SABE (queuing) + local search & Model-based estimator + optimisation, not a learned predictor; no ML/DL comparison \\
 \hline
 Quang et al.~\cite{quang2022routing} & SD-WAN sim. & Centralised optimisation & Optimisation, not prediction; no ML model comparison \\
 \hline
