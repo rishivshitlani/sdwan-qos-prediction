@@ -228,6 +228,29 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     This capability is especially important in SD-WAN environments where network conditions vary across different links and access types. Accurate QoS prediction can help optimize resource usage, reduce costs, and improve user experience.
 
+    Table~\ref{tab:trad_vs_ai} contrasts the traditional, rule-based approach to SD-WAN QoS management with the AI-assisted approach this thesis investigates. The central shift is from static, reactive control to learned, proactive decision support.
+
+    \begin{table}[H]
+    \centering
+    \caption{Traditional versus AI-assisted SD-WAN QoS management.}
+    \label{tab:trad_vs_ai}
+    \begin{tabular}{|p{5.5cm}|p{5.5cm}|}
+    \hline
+    \textbf{Traditional SD-WAN} & \textbf{AI-assisted SD-WAN} \\
+    \hline
+    Static configuration & Predictive from data \\
+    \hline
+    Reactive (acts after a problem) & Proactive (anticipates a problem) \\
+    \hline
+    Manual, expert-tuned policies & Learned from historical behaviour \\
+    \hline
+    Fixed queue weights & Adaptive, per-class allocation \\
+    \hline
+    One global setting & Class-aware (Gold/Silver/Bronze) decisions \\
+    \hline
+    \end{tabular}
+    \end{table}
+
 \chapter{Literature Review}
 \label{chap:lit_review}
 
@@ -303,15 +326,44 @@ Quang et al. (2022)~\cite{quang2022routing} presented a practical example of an 
 
 These findings support RQ3, confirming that AI is not only a research tool but can also be integrated into live systems if the environment supports it.
 
-\section{Research Gaps and Observations}
+\section{Comparative Analysis and Research Gaps}
 
-Despite the progress seen in these papers, several gaps were noticed:
+Rather than summarising each paper in isolation, Table~\ref{tab:lit-comparison} compares the reviewed works along the dimensions most relevant to this thesis: the data source, the modelling approach, the QoS aspect addressed, and the main limitation relative to the present work.
+
+\begin{table}[H]
+\centering
+\caption{Comparative analysis of the reviewed literature. Dataset descriptions are characterised from the cited works and should be read at the level of data \emph{type}.}
+\label{tab:lit-comparison}
+\small
+\begin{tabular}{|p{2.4cm}|p{1.9cm}|p{2.6cm}|p{3.9cm}|}
+\hline
+\textbf{Work} & \textbf{Data} & \textbf{Model} & \textbf{Gap relative to this thesis} \\
+\hline
+Rahman et al.~\cite{rahman2019autoscaling} & Simulation & RF + DNN & VNF autoscaling only; no per-class QoS prediction \\
+\hline
+Zheng et al.~\cite{zheng2022applicationaware} & SDN simulation & DNN + ILP & Classification + routing; single metric, no class-wise error \\
+\hline
+Dinh et al.~\cite{dinh2024safeloadbalancing} & Simulation & DRL (PPO/DDPG) & Control-focused; heavy compute; no interpretable prediction \\
+\hline
+Quang et al.~\cite{quang2023globalqos} & Analytical & Queuing theory (SABE) & Single metric (bandwidth); not learned; no QoS classes \\
+\hline
+Quang et al.~\cite{quang2022routing} & SD-WAN sim. & Centralised optimisation & Optimisation, not prediction; no ML model comparison \\
+\hline
+Chen et al.~\cite{chen2025mteal} & Simulation & GNN + MARL & Complex control pipeline; not a reproducible per-class study \\
+\hline
+\textbf{This thesis} & \textbf{Reprod.\ sim.} & \textbf{XGBoost, MLP, FT-Transf.} & \textbf{Per-class QoS-aware evaluation + DL-vs-ML + allocation recommender} \\
+\hline
+\end{tabular}
+\end{table}
+
+Reading across the table, a consistent pattern emerges. Most prior works: (i) rely on simulation with no reproducible public dataset; (ii) predict or optimise a single QoS dimension rather than several; (iii) do not treat Gold/Silver/Bronze traffic classes explicitly, so class-level failures stay hidden behind global metrics; (iv) do not compare deep learning against tree-based machine learning on the same task; and (v) stop at prediction or control without connecting the model back to an explicit bandwidth-allocation decision. These five gaps directly motivate the contributions of this thesis: per-class QoS-aware evaluation, a reproducible simulator-generated dataset, a tree-based versus deep-learning comparison, and an AI-assisted bandwidth-allocation recommender.
+
+The following specific observations were also noted:
 \begin{itemize}
-    \item Most research focuses on predicting a single QoS metric like latency or bandwidth, rather than multiple metrics at once.
-    \item Most results are based on simulations. Real-world deployment results in live SD-WAN systems are rare.
-    \item Only few research documents are focusing on using Artificial Intelligence in the prediction or correction of QOS. 
-    \item Public datasets related to SD-WAN traffic are hard to find, limiting reproducibility.
-    \item Few works compare the AI predictions directly against decisions made by standard SD-WAN controllers.
+    \item Most research predicts a single QoS metric (latency or bandwidth) rather than several at once.
+    \item Most results are simulation-based; live SD-WAN deployment results are rare.
+    \item Public SD-WAN QoS datasets are scarce, which limits reproducibility.
+    \item Few works compare AI predictions directly against the decisions a standard SD-WAN controller would make.
 \end{itemize}
 
 Filling these gaps could make QoS prediction models more robust, more generalizable, and more useful for industry.
@@ -398,6 +450,19 @@ The BNN-UPC feature set used for modelling contains:
 \end{itemize}
 
 Outcome columns such as \texttt{avg\_delay}, \texttt{jitter}, \texttt{packet\_loss\_rate}, delay percentiles, and \texttt{actual\_bandwidth} are removed from the input features to avoid leakage.
+
+\subsection{Feature Importance (SHAP)}
+
+To understand which features drive the delay prediction, SHAP (SHapley Additive exPlanations) values were computed for the trained XGBoost model. SHAP attributes each prediction to its input features and, unlike the model's built-in gain importance, also shows the \emph{direction} of each effect. Figure~\ref{fig:shap_summary} shows the SHAP summary for log delay.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Figures/fig_shap_summary.pdf}
+\caption{SHAP summary for the XGBoost log-delay model. Each point is a flow; position shows how much a feature pushed the prediction up (right, more delay) or down (left, less delay), and colour shows the feature value (red high, blue low).}
+\label{fig:shap_summary}
+\end{figure}
+
+The dominant driver is \texttt{routing\_hops}: flows with more hops (red) consistently receive a large positive push towards higher delay, while short paths (blue) reduce it. Network size (\texttt{n\_nodes}) and traffic class (\texttt{tos}) follow. This is physically sensible, since delay accumulates at each hop along a path. Queue weight, scheduling policy, and QoS-class indicators have comparatively small impact. The strong dependence on path structure, and the weak dependence on the dynamic-load features available here, is consistent with the later finding that the static feature set captures mean delay well but not the burst-driven variance of Bronze traffic.
 
 \section{Models}
 
@@ -538,7 +603,7 @@ PyTorch MLP & 0.185 & 0.357 & 0.766 & 0.769 \\
 \end{tabular}
 \end{table}
 
-The PyTorch MLP is slightly ahead of XGBoost on the global score, but the difference is small. This means that the neural-network path is competitive, while XGBoost remains an important explainable tree-based baseline for this tabular dataset. The useful comparison is therefore not only which model has the highest global score, but also whether the MLP and XGBoost behave similarly for each QoS class.
+The PyTorch MLP is marginally ahead of XGBoost on the global score, but the difference is very small and within cross-validation noise: the five-fold cross-validated $R^2$ is $0.766 \pm 0.008$ for XGBoost and $0.769 \pm 0.008$ for the MLP (mean $\pm$ standard deviation across folds). The fold-level variability is much larger than the mean difference. This means the neural-network path is competitive, while XGBoost remains an important explainable tree-based baseline for this tabular dataset. The useful comparison is therefore not only which model has the highest global score, but also whether the MLP and XGBoost behave similarly for each QoS class. Section~\ref{sec:significance} tests this difference formally.
 
 \section{QoS-Aware Evaluation}
 
@@ -763,6 +828,13 @@ On SLA detection the three models again behave similarly, with only small differ
 \caption{Per-class SLA-violation F1 score for the three models at the tuned thresholds (Gold 30 ms, Silver 50 ms, Bronze 60 ms). The models behave similarly; differences reflect small shifts in the precision--recall balance rather than a clear winner.}
 \label{fig:perclass_sla_f1}
 \end{figure}
+
+\subsubsection{Statistical Significance of the XGBoost--MLP Difference}
+\label{sec:significance}
+
+To test whether the small global gap between XGBoost and the MLP is real, both models were trained on the \emph{same} five cross-validation folds and their per-fold $R^2$ values were compared with paired tests. This fold-level paired comparison is the standard way to compare two learners under cross-validation; a per-row test was deliberately avoided because, with roughly 29{,}000 rows, even a negligible difference would register as significant.
+
+The MLP was higher by a mean of only $0.0006$ $R^2$ (XGBoost $0.765$, MLP $0.766$ averaged over the five folds). A paired $t$-test returned $p = 0.620$, while the rank-based Wilcoxon signed-rank test returned $p = 0.8125$. Both tests are non-significant at the $0.05$ level, and the difference ($0.0006$) is far smaller than the fold-to-fold standard deviation ($\approx 0.016$). The practical conclusion is that the two models are equivalent for this task: any difference is an order of magnitude smaller than normal resampling variation, and with only five folds the tests have limited power. This supports, with evidence rather than by inspection, the claim that the neural model does not meaningfully outperform the tree-based baseline.
 
 Overall, XGBoost is retained as the recommended model: it matches or slightly exceeds both neural models on accuracy while offering interpretability (feature importance) and substantially lower training cost (seconds versus minutes per fold for the FT-Transformer). The progression from a tree-based baseline through a feedforward MLP to a modern tabular Transformer confirms that the strong per-class results are a property of the data and features, not an artefact of a single model family, and that added model complexity does not improve QoS delay prediction on this dataset.
 

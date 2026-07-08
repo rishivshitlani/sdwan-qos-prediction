@@ -11,3 +11,5 @@ scapy
 openpyxl
 networkx
 pyyaml
+scipy
+shap

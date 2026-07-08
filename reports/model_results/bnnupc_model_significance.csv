@@ -1,0 +1,2 @@
+run_timestamp,comparison,cv_folds,target,xgb_fold_r2,mlp_fold_r2,xgb_r2_mean,xgb_r2_std,mlp_r2_mean,mlp_r2_std,mean_diff_xgb_minus_mlp,paired_ttest_p,paired_ttest_significant_at_0.05,wilcoxon_p,wilcoxon_significant_at_0.05,paired_tests_agree_at_0.05,practical_conclusion
+2026-07-08T09:10:21,XGBoost_vs_MLP,5,log_avg_delay,0.764496;0.775073;0.777675;0.737076;0.772646,0.767598;0.774630;0.776877;0.740322;0.770474,0.7653931132495956,0.01658189138753614,0.7659803804774741,0.01478772842176283,-0.0005872672278786295,0.6202417393803225,False,0.8125,False,True,no_meaningful_difference
