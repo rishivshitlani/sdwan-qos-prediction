@@ -133,7 +133,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
 
     In networks, traffic patterns keep fluctuating since different applications have different needs, and the same network might suddenly be overloaded. For example, video conferencing needs minimal or zero packet loss along with low latency, while file downloads just need higher bandwidth. If this is not taken care of, user experience is impacted and organizations may face penalties for violating SLAs(Service Level Agreements). Therefore, maintaining good QoS is not only critical but challenging.
 
-    Currently, most SD-WAN solutions use static policies to configure QoS. This means that network policies are either set manually in advance or adjusted after a problem is detected or reported. The problem here is: by the time a QoS issue is noticed, it might already be too late and user experience is already impacted. This delay can affect real-time applications like voice or video calls, which need instant action. There’s a clear need for a better, smarter solution.
+    Currently, most SD-WAN solutions use static policies to configure QoS, either set manually in advance or adjusted only after a problem is detected. Static policies cannot adapt to rapidly changing traffic conditions, and as a result they often violate application SLAs precisely when demand spikes: by the time a QoS issue is noticed, the user experience is already degraded. This is especially damaging for real-time applications such as voice and video calls, which need immediate action. There is therefore a clear need for a predictive, adaptive approach that can anticipate QoS problems before they occur rather than reacting after the fact.
     
     This is where Artificial Intelligence (AI) and Machine Learning (ML) come in and can help to resolve the problem. These technologies can learn from historical data and detect patterns in the network traffic. If trained correctly, ML models can predict QoS problems before they happen. For example, if the system learns that high video traffic around 2 PM usually leads to congestion, it can automatically adjust bandwidth or reroute traffic ahead of time. This kind of prediction allows network operators to prevent problems instead of just reacting to them.  
     
@@ -149,11 +149,13 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     This thesis aims to answer the following questions:
     \begin{itemize}
-        \item \textbf{RQ1}: What types of AI or ML techniques are currently or can be used for predicting QoS in SD-WAN?
-        \item \textbf{RQ2}: What are the benefits and limitations of these approaches in terms of prediction accuracy, scalability, and real-world use?
-        \item \textbf{RQ3}: How can QoS prediction be effectively integrated into SD-WAN production environments to improve network performance?
+        \item \textbf{RQ1}: Can supervised machine learning accurately predict per-class QoS metrics (average delay, tail delay, jitter, and packet loss) in an SD-WAN-like environment?
+        \item \textbf{RQ2}: Which model family --- tree-based machine learning (XGBoost) or deep learning (a feedforward MLP and an FT-Transformer) --- offers the best balance of predictive accuracy, interpretability, and training/inference cost for this task?
+        \item \textbf{RQ3}: Can the predicted per-class QoS be used to support an automated bandwidth-allocation decision?
     \end{itemize}
-    
+
+    These questions map directly onto the three implemented layers: RQ1 and RQ2 are answered by the per-class delay-prediction experiments (Layer~2), and RQ3 by the allocation recommender (Layer~3).
+
     \subsection*{Methodology}
     
     To explore these questions, I conducted a literature review using academic databases like IEEE Xplore, Scopus, and Google Scholar. I searched for terms such as “QoS prediction,” “SD-WAN,” “machine learning in networking,” and “AI-based traffic forecasting.” Papers published between 2020 and 2025 were prioritized, and older foundational works were included when relevant.
@@ -161,7 +163,19 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     The implementation then followed an experimental approach. First, public datasets were reviewed and unsuitable proxy datasets were removed from the main modelling path. Second, supervised ML models were trained on the Zenodo and BNN-UPC datasets, including classical ML models, a feedforward MLP, and an FT-Transformer. Third, the BNN-UPC results were evaluated using QoS-aware metrics, including per-class error, policy-specific slicing, RMSLE, and SLA violation precision. Finally, a simple allocation recommender was built to connect prediction to an SD-WAN control decision. The allocation recommender currently uses the XGBoost delay model; extending it to the neural models is left as future work.
 
     The literature review and background material in this thesis are secondary research, summarising work already published by others. The dataset generation, preprocessing, modelling, QoS-aware evaluation, and allocation recommender are the author's own primary research and constitute the contribution of this work.
-    
+
+    \subsection*{Contributions of this Thesis}
+    \label{sec:contributions}
+
+    The main contributions of this thesis are:
+    \begin{enumerate}
+        \item \textbf{A layered AI framework for SD-WAN QoS decision support}, connecting link-capacity prediction (Layer~1), per-class QoS prediction (Layer~2), and bandwidth-allocation recommendation (Layer~3) into a single pipeline.
+        \item \textbf{A reproducible per-class QoS dataset} generated with the official BNNetSimulator, providing Gold/Silver/Bronze delay, jitter, and loss under different scheduling policies, together with the code to regenerate it.
+        \item \textbf{A QoS-aware evaluation methodology} that goes beyond global MAE/RMSE/$R^2$ to per-class error, RMSLE, scheduling-policy and scenario slices, and SLA-violation precision/recall --- exposing class-level behaviour that a single global metric hides.
+        \item \textbf{A controlled comparison of tree-based machine learning and deep learning} (XGBoost versus an MLP and an FT-Transformer) under an identical out-of-fold protocol, including fold-level variability and a paired statistical significance test.
+        \item \textbf{An AI-assisted WFQ allocation recommender} that uses the delay model as a surrogate to rank candidate bandwidth profiles and, importantly, flags when no profile can satisfy the SLA --- turning prediction into an actionable, and honestly bounded, control decision.
+    \end{enumerate}
+
     \subsection*{Structure of the Document}
     
     This document is structured as follows:
@@ -285,11 +299,11 @@ The selected papers cover a range of methods and applications—some focus on pr
 \label{tab:lit-summary}
 \begin{tabular}{|p{3.1cm}|p{3.0cm}|p{4.4cm}|p{1.8cm}|}
 \hline
-\textbf{Paper} & \textbf{AI/ML Technique} & \textbf{Main Focus} & \textbf{Related RQ(s)} \\
+\textbf{Paper} & \textbf{Technique / Method} & \textbf{Main Focus} & \textbf{Related RQ(s)} \\
 \hline
 Rahman et al.~\cite{rahman2019autoscaling} & Random Forest, DNN & Predicting VNF requirements to maintain QoS and reduce cost & RQ1, RQ2, RQ3 \\
 \hline
-Zheng et al.~\cite{zheng2022applicationaware} & Deep Neural Network + ILP & Classifying application types and assigning QoS-based routes & RQ1, RQ2 \\
+Zheng et al.~\cite{zheng2022applicationaware} & Supervised ML + QoS routing & Classifying application types and assigning QoS-based routes & RQ1, RQ2 \\
 \hline
 Dinh et al.~\cite{dinh2024safeloadbalancing} & DRL (PPO, DDPG) with CBF & Safe traffic routing using AI that respects network constraints & RQ1, RQ2 \\
 \hline
@@ -304,15 +318,15 @@ Chen et al.~\cite{chen2025mteal} & GNN + MARL & SD-WAN traffic engineering with 
 
 \section{AI and ML Methods for QoS Prediction (RQ1)}
 
-Many studies have applied AI techniques to network traffic prediction and management. For instance, Rahman et al. (2019)~\cite{rahman2019autoscaling} used Random Forest and deep learning models to predict how many virtual network functions (VNFs) are needed during a traffic surge. Their models achieved over 95\% accuracy and could prevent service degradation by scaling resources in advance.
+Many studies have applied AI techniques to network traffic prediction and management. For instance, Rahman et al. (2018)~\cite{rahman2019autoscaling} used Random Forest and deep learning models to predict how many virtual network functions (VNFs) are needed during a traffic surge. Their models achieved over 95\% accuracy and could prevent service degradation by scaling resources in advance.
 
-Similarly, Zheng et al. (2022)~\cite{zheng2022applicationaware} developed a deep neural network to classify traffic flows based on their latency sensitivity. They then routed this traffic using a QoS-Aware Routing algorithm that selected paths depending on the required delay tolerance. This combination of classification and path assignment showed how AI can directly improve QoS outcomes.
+Similarly, Zheng et al. (2022)~\cite{zheng2022applicationaware} used supervised machine-learning techniques to classify traffic flows according to application type and QoS requirements. They then routed this traffic using a QoS-aware routing algorithm that selected paths depending on the required delay tolerance. This combination of classification and path assignment showed how AI can directly improve QoS outcomes.
 
 These studies clearly support RQ1 by showing that supervised learning and deep learning can be applied to anticipate traffic needs and assign optimal resources in advance.
 
 \section{Suitability and Real-World Limitations (RQ2)}
 
-Although the above techniques work well in controlled settings, there are challenges when using them in real networks. For example, the deep reinforcement learning (DRL) model by Dinh et al. (2024) ~\cite{dinh2024safeloadbalancing} well in simulations and maintains safe traffic routing using control barrier functions (CBFs). However, DRL requires a lot of training time and GPU support, which may not be available in all SD-WAN deployments.
+Although the above techniques work well in controlled settings, there are challenges when using them in real networks. For example, the deep reinforcement learning (DRL) model by Dinh et al. (2024)~\cite{dinh2024safeloadbalancing} performs well in simulations and maintains safe traffic routing using control barrier functions (CBFs). However, DRL requires substantial training time and often benefits from GPU acceleration, which may not be available in all SD-WAN deployments.
 
 In contrast, Quang et al. (2023)~\cite{quang2023globalqos} take an analytical rather than a learned approach. Their central contribution is SABE, a bandwidth estimator that infers how much capacity is actually free on each overlay link \emph{without sending probe traffic}. SABE models each link as an M/M/1/K queue and inverts the standard queuing-theory equations for delay and loss: because SD-WAN routers already report measured delay and loss, these measurements are used to recover the total load on the link, and subtracting the SD-WAN's own traffic yields the hidden cross-traffic and hence the available bandwidth. This estimate then feeds a two-loop controller: a slower loop optimises routing (path split ratios) and a faster loop tunes per-class QoS policies (queue weights and shaper rates) using a lightweight local-search optimiser instead of a slow exact solver. Traffic is grouped into four classes (Critical, VoIP, Office, Bulk), each with its own delay and loss target.
 
@@ -322,11 +336,11 @@ This work is directly relevant to the present thesis, but it is important to not
 
 \section{Integration into SD-WAN Systems (RQ3)}
 
-Several papers also discussed how these models can be integrated into actual SD-WAN systems. For instance, Rahman et al. (2019)~\cite{rahman2019autoscaling} simulated an SD-WAN scenario where their ML models helped reduce both QoS violations and cloud leasing costs by scaling VNFs only when necessary.
+Several papers also discussed how these models can be integrated into actual SD-WAN systems. For instance, Rahman et al. (2018)~\cite{rahman2019autoscaling} simulated an SD-WAN scenario where their ML models helped reduce both QoS violations and cloud leasing costs by scaling VNFs only when necessary.
 
-Quang et al. (2022)~\cite{quang2022routing} presented a practical example of an enterprise moving from traditional MPLS to SD-WAN. Their central controller dynamically adjusted both routing and QoS scheduling based on the current network status. This shows that AI-based prediction and decision-making can be realistically applied in SD-WAN setups to improve efficiency and reliability.
+Quang et al. (2022)~\cite{quang2022routing} presented a practical example of an enterprise moving from traditional MPLS to SD-WAN. Their central controller dynamically adjusted both routing and QoS scheduling based on the current network status. This shows that optimisation-based decision-making can be realistically applied in SD-WAN setups to improve efficiency and reliability, even when the control logic is not a learned predictor.
 
-These findings support RQ3, confirming that AI is not only a research tool but can also be integrated into live systems if the environment supports it.
+These findings support RQ3, confirming that automated decision support is not only a research idea but can also be integrated into live systems if the environment supports it.
 
 \section{Comparative Analysis and Research Gaps}
 
@@ -343,7 +357,7 @@ Rather than summarising each paper in isolation, Table~\ref{tab:lit-comparison} 
 \hline
 Rahman et al.~\cite{rahman2019autoscaling} & Simulation & RF + DNN & VNF autoscaling only; no per-class QoS prediction \\
 \hline
-Zheng et al.~\cite{zheng2022applicationaware} & SDN simulation & DNN + ILP & Classification + routing; single metric, no class-wise error \\
+Zheng et al.~\cite{zheng2022applicationaware} & SDN simulation & Supervised ML + QoS routing & Classification + routing; single metric, no class-wise error \\
 \hline
 Dinh et al.~\cite{dinh2024safeloadbalancing} & Simulation & DRL (PPO/DDPG) & Control-focused; heavy compute; no interpretable prediction \\
 \hline
@@ -358,7 +372,7 @@ Chen et al.~\cite{chen2025mteal} & Simulation & GNN + MARL & Complex control pip
 \end{tabular}
 \end{table}
 
-Reading across the table, a consistent pattern emerges. Most prior works: (i) rely on simulation with no reproducible public dataset; (ii) predict or optimise a single QoS dimension rather than several; (iii) do not treat Gold/Silver/Bronze traffic classes explicitly, so class-level failures stay hidden behind global metrics; (iv) do not compare deep learning against tree-based machine learning on the same task; and (v) stop at prediction or control without connecting the model back to an explicit bandwidth-allocation decision. These five gaps directly motivate the contributions of this thesis: per-class QoS-aware evaluation, a reproducible simulator-generated dataset, a tree-based versus deep-learning comparison, and an AI-assisted bandwidth-allocation recommender.
+Reading across the table, a consistent pattern emerges. Most prior works: (i) rely on simulation with no reproducible public dataset; (ii) predict or optimise a single QoS dimension rather than several; (iii) do not treat Gold/Silver/Bronze traffic classes explicitly, so class-level failures stay hidden behind global metrics; (iv) do not compare deep learning against tree-based machine learning on the same task; and (v) stop at prediction or control without connecting the model back to an explicit bandwidth-allocation decision. These five gaps directly motivate the contributions of this thesis, listed in Section~\ref{sec:contributions}: per-class QoS-aware evaluation, a reproducible simulator-generated dataset, a tree-based versus deep-learning comparison, and an AI-assisted bandwidth-allocation recommender.
 
 The following specific observations were also noted:
 \begin{itemize}
