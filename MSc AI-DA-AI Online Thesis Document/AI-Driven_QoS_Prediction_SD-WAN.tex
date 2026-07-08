@@ -150,7 +150,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     This thesis aims to answer the following questions:
     \begin{itemize}
         \item \textbf{RQ1}: Can supervised machine learning accurately predict per-class QoS metrics (average delay, tail delay, jitter, and packet loss) in an SD-WAN-like environment?
-        \item \textbf{RQ2}: Which model family --- tree-based machine learning (XGBoost) or deep learning (a feedforward MLP and an FT-Transformer) --- offers the best balance of predictive accuracy, interpretability, and training/inference cost for this task?
+        \item \textbf{RQ2}: Which model family, tree-based machine learning (XGBoost) or deep learning (a feedforward MLP and an FT-Transformer), offers the best balance of predictive accuracy, interpretability, and training/inference cost for this task?
         \item \textbf{RQ3}: Can the predicted per-class QoS be used to support an automated bandwidth-allocation decision?
     \end{itemize}
 
@@ -171,9 +171,9 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     \begin{enumerate}
         \item \textbf{A layered AI framework for SD-WAN QoS decision support}, connecting link-capacity prediction (Layer~1), per-class QoS prediction (Layer~2), and bandwidth-allocation recommendation (Layer~3) into a single pipeline.
         \item \textbf{A reproducible per-class QoS dataset} generated with the official BNNetSimulator, providing Gold/Silver/Bronze delay, jitter, and loss under different scheduling policies, together with the code to regenerate it.
-        \item \textbf{A QoS-aware evaluation methodology} that goes beyond global MAE/RMSE/$R^2$ to per-class error, RMSLE, scheduling-policy and scenario slices, and SLA-violation precision/recall --- exposing class-level behaviour that a single global metric hides.
+        \item \textbf{A QoS-aware evaluation methodology} that goes beyond global MAE/RMSE/$R^2$ to per-class error, RMSLE, scheduling-policy and scenario slices, and SLA-violation precision/recall, exposing class-level behaviour that a single global metric hides.
         \item \textbf{A controlled comparison of tree-based machine learning and deep learning} (XGBoost versus an MLP and an FT-Transformer) under an identical out-of-fold protocol, including fold-level variability and a paired statistical significance test.
-        \item \textbf{An AI-assisted WFQ allocation recommender} that uses the delay model as a surrogate to rank candidate bandwidth profiles and, importantly, flags when no profile can satisfy the SLA --- turning prediction into an actionable, and honestly bounded, control decision.
+        \item \textbf{An AI-assisted WFQ allocation recommender} that uses the delay model as a surrogate to rank candidate bandwidth profiles and, importantly, flags when no profile can satisfy the SLA, turning prediction into an actionable, and honestly bounded, control decision.
     \end{enumerate}
 
     \subsection*{Structure of the Document}
@@ -186,6 +186,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
         \item Chapter~\ref{chap:lit_review} presents the literature review, including an analysis of academic work on QoS prediction in SD-WAN using AI and ML techniques.
         \item Chapter~\ref{chap:methodology} outlines the methodology, including dataset selection, feature engineering, model design, QoS-aware evaluation, and the allocation recommender.
         \item Chapter~\ref{chap:results} presents the experimental setup and results for the Zenodo and BNN-UPC datasets.
+        \item Chapter~\ref{chap:discussion} discusses why the results occurred, including why some QoS classes are harder to predict and why deep learning did not outperform the tree-based model.
         \item Chapter~\ref{chap:limitations} states the limitations of the work, including data realism, the static-feature ceiling, and offline evaluation.
         \item Chapter~\ref{chap:conclusion} concludes the thesis by summarising findings, discussing impact, and identifying directions for future work.
     \end{itemize}
@@ -238,7 +239,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     
     \section{Importance of QoS Prediction in SD-WAN}
     
-    Modern enterprises rely on applications that require consistent and reliable network performance. Static or reactive QoS mechanisms are often too slow to prevent performance issues. QoS prediction enables a more proactive approach—by forecasting issues before they occur, it becomes possible to take preventive actions like re-routing traffic or scaling resources.
+    Modern enterprises rely on applications that require consistent and reliable network performance. Static or reactive QoS mechanisms are often too slow to prevent performance issues. QoS prediction enables a more proactive approach. By forecasting issues before they occur, it becomes possible to take preventive actions like re-routing traffic or scaling resources.
     
     This capability is especially important in SD-WAN environments where network conditions vary across different links and access types. Accurate QoS prediction can help optimize resource usage, reduce costs, and improve user experience.
 
@@ -291,7 +292,7 @@ The search focused on papers published between 2018 and 2025 to ensure up-to-dat
 Although the topic of QoS prediction using AI in SD-WAN is promising, the literature review revealed a limited number of high-quality research papers that directly focus on this specific intersection. Most existing studies either concentrate on general SDN environments or address QoS management without the use of AI or ML techniques. Nonetheless, this review provides valuable insights and highlights key research gaps that warrant further investigation.
 \section{Overview of Selected Papers}
 
-The selected papers cover a range of methods and applications—some focus on predicting traffic load, others on routing or load balancing. Table \ref{tab:lit-summary} categorizes these papers by their core approach and relevance to the research questions.
+The selected papers cover a range of methods and applications: some focus on predicting traffic load, others on routing or load balancing. Table \ref{tab:lit-summary} categorizes these papers by their core approach and relevance to the research questions.
 
 \begin{table}[h]
 \centering
@@ -983,6 +984,35 @@ The completed experiments show seven main findings:
     \item Packet loss is only meaningful for Bronze traffic in a realistic network. Regression on packet\_loss\_rate is not feasible from static features ($R^2 = -0.130$), but binary classification (loss vs.\ no loss) achieves AUC-ROC = 0.916 for Bronze flows, confirming the model can identify loss-prone flows reliably.
     \item Three model families were compared per class under an identical evaluation protocol: XGBoost, a feedforward MLP, and a modern attention-based FT-Transformer. All three converge to the same per-class ceiling (Bronze $R^2 \approx 0.70$ for every model), and neither neural model beats XGBoost. This shows the limiting factor is the static feature set, not model capacity, and XGBoost is retained as the recommended model for its equal accuracy, interpretability, and far lower training cost.
 \end{itemize}
+
+\chapter{Discussion}
+\label{chap:discussion}
+
+The previous chapter reported what the models achieved. This chapter explains why those results occurred, which is where the practical and scientific value of the work lies. Five questions are addressed: why some QoS classes are far easier to predict than others, why deep learning did not outperform a tree-based model, why jitter and packet loss resist prediction, why link throughput is easier to predict than per-class delay, and what all of this means for a real SD-WAN deployment.
+
+\section{Why Per-Class Predictability Differs}
+
+Gold and Silver delay are predicted well ($R^2 \approx 0.91$), while Bronze is much harder ($R^2 \approx 0.70$). The reason lies in how the scheduler treats each class. Gold and Silver traffic is protected by high queue priority, so its delay is dominated by the deterministic part of the system: the number of hops on the path and the configured queue weights. The SHAP analysis in Figure~\ref{fig:shap_summary} confirms this, showing that \texttt{routing\_hops} is by far the strongest predictor, followed by network size and traffic class. These are exactly the static, configuration-level quantities the model has access to, so it can learn them well.
+
+Bronze traffic is best-effort. It is served only after the higher-priority classes, so its delay is governed by transient queue contention: short bursts of higher-priority traffic that momentarily starve the Bronze queue. This burstiness is a dynamic, moment-to-moment property that the static feature set does not describe. The model can predict the average behaviour of Bronze traffic but not the variance introduced by contention, which is why its error is both larger and more heavy-tailed. The same mechanism explains why the Bronze tail delay (\texttt{delay\_p90}) is harder still: the tail is precisely where contention events dominate.
+
+\section{Why Deep Learning Did Not Outperform Tree-Based Models}
+
+A central result is that the MLP and the FT-Transformer matched, but did not beat, XGBoost, and that the three models converged to the same per-class ceiling. This is consistent with a growing body of evidence that gradient-boosted decision trees remain highly competitive on small, static, tabular datasets. Grinsztajn et al.~\cite{grinsztajn2022trees} and Shwartz-Ziv and Armon~\cite{shwartzziv2022tabular} both show that tree ensembles typically equal or exceed deep networks on tabular problems, because trees handle irregular, non-smooth feature interactions and are far less sensitive to uninformative features and to the absence of large training sets.
+
+The present dataset has exactly these characteristics: around 29{,}000 rows, eleven mostly static features, and no temporal or relational structure for an attention mechanism to exploit. The FT-Transformer's strength, learning interactions across many feature tokens, brings little benefit when the target is already well explained by a few dominant features (chiefly path length). The convergence of all three model families is therefore not a failure of the neural models; it is evidence that the ceiling is set by the information available in the features rather than by model capacity. This reframes the negative result as a meaningful finding about the problem, not the method.
+
+\section{Why Jitter and Packet Loss Resist Prediction}
+
+Jitter is almost unpredictable from the available features ($R^2 < 0.12$), and exact packet-loss rate cannot be regressed at all ($R^2 = -0.130$ for Bronze). Both outcomes have the same root cause as the Bronze delay difficulty, in a stronger form. Jitter is the variation of delay, and packet loss is caused by momentary buffer overflow; both are driven almost entirely by short-timescale traffic burstiness rather than by the average configuration. The static feature set records what the network is configured to do, not what the traffic is doing at any instant, so the information needed to predict these quantities is simply not present. This is a limitation of feature observability, and it is why the packet-loss problem was reframed as binary classification (will a flow experience any loss?), which succeeds with an AUC-ROC of 0.916: identifying which flows are at risk needs only the average conditions, whereas quantifying the exact loss needs the missing dynamic information.
+
+\section{Why Link Throughput Is Easier to Predict Than Per-Class Delay}
+
+The Layer~1 throughput task reaches a much higher accuracy (held-out $R^2 \approx 0.98$) than the Layer~2 delay task. This is expected. Achieved throughput on a radio link is largely a direct, monotonic function of the measured channel and traffic conditions, so the input features carry a strong and stable signal about the output. Per-class delay, by contrast, is an emergent property of queueing interactions between competing traffic classes at each hop, which is a more indirect and higher-variance relationship. The contrast is itself informative: it shows that the difficulty is not machine learning in networking per se, but the specific gap between static configuration features and the dynamic phenomena that drive per-class QoS.
+
+\section{Operational Implications for SD-WAN}
+
+Several findings matter for a real deployment. First, the very high Gold SLA-violation precision (0.994) is the most operationally useful number in the thesis: an SD-WAN controller can act on a predicted Gold violation with high confidence that it is real, avoiding the unnecessary rerouting that a false alarm on high-priority traffic would cause. Second, because XGBoost matches the neural models while remaining interpretable and training in seconds rather than minutes, it is the sensible choice for a system that must retrain and infer close to real time. Third, the allocation recommender's ability to report that no weight profile can satisfy the SLA is arguably more valuable than the recommendation itself: it tells the controller when the problem cannot be solved by tuning queue weights and that rerouting or additional capacity is required. Taken together, these results support a practical division of labour in which learned models handle the well-conditioned, high-priority predictions and flag the cases where a different control action is needed.
 
 \chapter{Limitations}
 \label{chap:limitations}
