@@ -20,6 +20,9 @@ data/raw/BNN_UPC/*
 !data/raw/BNN_UPC/README.md
 data/interim/
 data/processed/
+!data/processed/
+data/processed/*
+!data/processed/bnnupc_qos_dataset.csv
 data/synthetic/
 !data/synthetic/
 data/synthetic/*
