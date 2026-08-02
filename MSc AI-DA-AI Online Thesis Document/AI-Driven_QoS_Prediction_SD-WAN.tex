@@ -348,7 +348,7 @@ Many studies have applied AI techniques to network traffic prediction and manage
 
 Similarly, Zheng et al. (2022)~\cite{zheng2022applicationaware} used supervised machine-learning techniques to classify traffic flows according to application type and QoS requirements. They then routed this traffic using a QoS-aware routing algorithm that selected paths depending on the required delay tolerance. This combination of classification and path assignment showed how AI can directly improve QoS outcomes.
 
-These studies clearly support RQ1 by showing that supervised learning and deep learning can be applied to anticipate traffic needs and assign optimal resources in advance.
+These studies demonstrate that machine learning can support proactive network management, but their objectives differ from those of this thesis. Rahman et al. predict VNF scaling decisions from private ISP traffic data, whereas Zheng et al. classify applications before applying a QoS-aware routing algorithm. Neither study directly predicts continuous per-flow QoS outcomes for differentiated traffic classes. In contrast, this thesis treats QoS prediction as a supervised regression problem. It first predicts achieved throughput using public measurements from a 5G campus-network testbed and then predicts per-flow delay for Gold, Silver and Bronze traffic using a reproducible BNNetSimulator-generated dataset. Furthermore, rather than reporting only global model accuracy or routing performance, the models are evaluated separately by QoS class, scheduling policy and network scenario. XGBoost is also compared with a feedforward neural network and an FT-Transformer on the same prediction task. Finally, the predicted delay is connected to a bandwidth-allocation recommender, extending the work from prediction to an explicit SD-WAN control decision.
 
 \section{Suitability and Real-World Limitations (RQ2)}
 
@@ -360,13 +360,17 @@ In their NS-3 simulation, combining routing optimisation, QoS optimisation, and 
 
 This work is directly relevant to the present thesis, but it is important to note what it is \emph{not}: SABE is a fixed, model-based estimator, not a learned one. Its accuracy rests on the M/M/1/K assumption of Poisson arrivals and exponential service times, which does not describe the bursty, self-similar traffic of real WANs; this is precisely the assumption a data-driven model could relax. SABE therefore serves as a strong non-learned baseline that motivates the machine-learning direction taken here. More generally, this contrast shows that AI models are powerful but their complexity and resource requirements must be weighed against simpler analytical methods before deployment, which directly addresses RQ2.
 
+The reviewed studies also differ from this thesis in their treatment of real-world applicability. Most evaluate their methods using constructed traffic scenarios or network simulators, while Rahman et al. use operational traffic from a private ISP that cannot be independently reproduced. This thesis partly addresses this limitation by using an openly available 5G measurement dataset and publishing a reproducible BNNetSimulator workflow. Nevertheless, its BNN-UPC experiment remains simulation-based and therefore cannot fully represent deployment factors such as hardware behaviour, measurement noise, routing instability and unobserved cross-traffic. Consequently, the contribution is a reproducible and QoS-aware experimental framework rather than evidence of production readiness.
+
 \section{Integration into SD-WAN Systems (RQ3)}
 
 Several papers also discussed how these models can be integrated into actual SD-WAN systems. For instance, Rahman et al. (2018)~\cite{rahman2019autoscaling} simulated an SD-WAN scenario where their ML models helped reduce both QoS violations and cloud leasing costs by scaling VNFs only when necessary.
 
 Quang et al. (2022)~\cite{quang2022routing} presented a practical example of an enterprise moving from traditional MPLS to SD-WAN. Their central controller dynamically adjusted both routing and QoS scheduling based on the current network status. This shows that optimisation-based decision-making can be realistically applied in SD-WAN setups to improve efficiency and reliability, even when the control logic is not a learned predictor.
 
-These findings support RQ3, confirming that automated decision support is not only a research idea but can also be integrated into live systems if the environment supports it.
+This differs from the present thesis in kind rather than in degree. The Quang et al. (2022) controller optimises routing and scheduling centrally, but it contains no learned predictive model, so it cannot anticipate a specific flow's delay or SLA risk ahead of time; it reacts to the current network state rather than a forecast of it. This thesis instead trains and compares explicit QoS predictors, both tree-based (XGBoost) and neural (a feedforward MLP and an FT-Transformer), evaluates them separately per QoS class, and only then uses the predictions to recommend a bandwidth allocation, flagging when no allocation can meet the SLA. The two approaches therefore target different parts of the same problem: Quang et al. (2022) demonstrate non-learned, centralised optimisation in an NS-3 SD-WAN scenario, while this thesis examines whether a QoS predictor can be made accurate and honest enough, on a per-class basis, to support that kind of decision in the first place.
+
+These findings support RQ3, confirming that automated decision support, whether optimisation-based or learned, is not only a research idea but can also be integrated into live systems if the environment supports it.
 
 \section{Comparative Analysis and Research Gaps}
 
@@ -376,29 +380,29 @@ Rather than summarising each paper in isolation, Table~\ref{tab:lit-comparison} 
 \centering
 \caption{Comparative analysis of the reviewed literature. Dataset descriptions are characterised from the cited works and should be read at the level of data \emph{type}.}
 \label{tab:lit-comparison}
-\small
-\begin{tabular}{|p{2.4cm}|p{1.9cm}|p{2.6cm}|p{3.9cm}|}
+\footnotesize
+\begin{tabular}{|p{2.1cm}|p{2.65cm}|p{2.55cm}|p{3.4cm}|}
 \hline
 \textbf{Work} & \textbf{Data} & \textbf{Model} & \textbf{Gap relative to this thesis} \\
 \hline
-Rahman et al.~\cite{rahman2019autoscaling} & Simulation & RF + DNN & VNF autoscaling only; no per-class QoS prediction \\
+Rahman et al.~\cite{rahman2019autoscaling} & Private ISP traffic + modelled use case & RF + DNN & VNF autoscaling only; no per-class QoS prediction \\
 \hline
-Zheng et al.~\cite{zheng2022applicationaware} & SDN simulation & Supervised ML + QoS routing & Classification + routing; single metric, no class-wise error \\
+Zheng et al.~\cite{zheng2022applicationaware} & Constructed traffic + SDN sim. & Supervised ML + QoS routing & Classification + routing; single metric, no class-wise error \\
 \hline
-Dinh et al.~\cite{dinh2024safeloadbalancing} & Simulation & DRL (PPO/DDPG) & Control-focused; heavy compute; no interpretable prediction \\
+Dinh et al.~\cite{dinh2024safeloadbalancing} & Custom flow/packet sim. & DRL (PPO/DDPG) & Control-focused; heavy compute; no interpretable prediction \\
 \hline
-Quang et al.~\cite{quang2023globalqos} & NS-3 sim. & SABE (queuing) + local search & Model-based estimator + optimisation, not a learned predictor; no ML/DL comparison \\
+Quang et al.~\cite{quang2023globalqos} & NS-3 packet-level sim. & SABE (queuing) + local search & Model-based estimator + optimisation, not a learned predictor; no ML/DL comparison \\
 \hline
-Quang et al.~\cite{quang2022routing} & SD-WAN sim. & Centralised optimisation & Optimisation, not prediction; no ML model comparison \\
+Quang et al.~\cite{quang2022routing} & NS-3 packet-level sim. & Centralised optimisation & Optimisation, not prediction; no ML model comparison \\
 \hline
-Chen et al.~\cite{chen2025mteal} & Simulation & GNN + MARL & Complex control pipeline; not a reproducible per-class study \\
+Chen et al.~\cite{chen2025mteal} & Public topology + sim. traffic & GNN + MARL & Complex control pipeline; not a reproducible per-class study \\
 \hline
 \textbf{This thesis} & \textbf{Reprod.\ sim.} & \textbf{XGBoost, MLP, FT-Transf.} & \textbf{Per-class QoS-aware evaluation + DL-vs-ML + allocation recommender} \\
 \hline
 \end{tabular}
 \end{table}
 
-Reading across the table, a consistent pattern emerges. Most prior works: (i) rely on simulation with no reproducible public dataset; (ii) predict or optimise a single QoS dimension rather than several; (iii) do not treat Gold/Silver/Bronze traffic classes explicitly, so class-level failures stay hidden behind global metrics; (iv) do not compare deep learning against tree-based machine learning on the same task; and (v) stop at prediction or control without connecting the model back to an explicit bandwidth-allocation decision. These five gaps directly motivate the contributions of this thesis, listed in Section~\ref{sec:contributions}: per-class QoS-aware evaluation, a reproducible simulator-generated dataset, a tree-based versus deep-learning comparison, and an AI-assisted bandwidth-allocation recommender.
+Reading across the table, a consistent pattern emerges. Most prior works: (i) rely on private, author-constructed, or simulated traffic, and none uses a fully public, downloadable, labelled SD-WAN QoS dataset (Chen et al. use public WAN topologies only, with simulated traffic and QoS outcomes); (ii) predict or optimise a single QoS dimension rather than several; (iii) do not treat Gold/Silver/Bronze traffic classes explicitly, so class-level failures stay hidden behind global metrics; (iv) do not compare deep learning against tree-based machine learning on the same task; and (v) stop at prediction or control without connecting the model back to an explicit bandwidth-allocation decision. These five gaps directly motivate the contributions of this thesis, listed in Section~\ref{sec:contributions}: per-class QoS-aware evaluation, a reproducible simulator-generated dataset, a tree-based versus deep-learning comparison, and an AI-assisted bandwidth-allocation recommender.
 
 The following specific observations were also noted:
 \begin{itemize}
@@ -408,7 +412,7 @@ The following specific observations were also noted:
     \item Few works compare AI predictions directly against the decisions a standard SD-WAN controller would make.
 \end{itemize}
 
-Of these four gaps, this thesis directly closes two. It predicts multiple QoS metrics (average delay, tail delay, jitter, and packet loss) rather than a single one, and it releases a reproducible dataset generated with BNNetSimulator together with the code needed to regenerate it. The remaining two gaps are not closed by this thesis: like the works reviewed above, its results are simulation-based rather than measured on a live SD-WAN (Chapter~\ref{chap:limitations} discusses this explicitly), and the Layer~3 recommender in Chapter~\ref{chap:results} ranks candidate bandwidth profiles against each other using the trained model rather than against the decision a standard, rule-based SD-WAN controller would actually make. Filling these gaps could make QoS prediction models more robust, more generalizable, and more useful for industry; the controller-comparison gap is carried forward explicitly as future work (Chapter~\ref{chap:conclusion}).
+Of these four gaps, this thesis only partially closes two and leaves two open. It evaluates multiple QoS metrics (average delay, tail delay, jitter, and packet loss) rather than a single one, though each is modelled separately rather than jointly. It also improves reproducibility by releasing a BNNetSimulator-generated dataset together with the code needed to regenerate it, but this is a simulator-generated dataset, not a publicly collected operational SD-WAN measurement dataset, so the wider scarcity of such data is only partly mitigated. The remaining two gaps are not closed: like the works reviewed above, its BNN-UPC results are simulation-based rather than measured on a live SD-WAN, although the throughput experiment does use real 5G testbed measurements (Chapter~\ref{chap:limitations} discusses this explicitly); and the Layer~3 recommender in Chapter~\ref{chap:results} ranks candidate bandwidth profiles against each other using the trained model rather than against the decision a standard, rule-based SD-WAN controller would actually make. The contribution should therefore be read as a reproducible proof of concept rather than evidence of production readiness; both the controller-comparison and live-deployment gaps are carried forward explicitly as future work (Chapter~\ref{chap:conclusion}).
 
 \section{Summary of the Literature Review}
 
