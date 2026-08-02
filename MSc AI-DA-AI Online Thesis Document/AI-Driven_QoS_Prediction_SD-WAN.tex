@@ -220,7 +220,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
     \chapter{Background}
     \label{chap:backg}
     
-    This chapter provides foundational knowledge needed to understand the scope and significance of this thesis. It covers the key concepts of SD-WAN, QoS metrics in networking, and the role of AI in network management. These concepts establish the context for the research discussed in later chapters.
+    This chapter introduces SD-WAN, QoS, and AI in network management to provide context for the thesis.
 
     \section{SD-WAN}
     
@@ -260,7 +260,7 @@ The Bronze SLA violation threshold is tuned from 100 ms to 60 ms based on a thre
         \item Forecast QoS metrics and warn of potential SLA violations.
     \end{itemize}
     
-    AI models used for QoS prediction typically include supervised learning algorithms (like decision trees and neural networks) and reinforcement learning (used in adaptive routing and load balancing). These models require training on historical network data to make accurate forecasts.
+    AI models for QoS prediction typically include supervised learning (e.g., decision trees, neural networks) and reinforcement learning, trained on historical network data to forecast future conditions.
     
     \section{Importance of QoS Prediction in SD-WAN}
     
@@ -317,30 +317,7 @@ The search focused on papers published between 2018 and 2025 to ensure up-to-dat
 Although the topic of QoS prediction using AI in SD-WAN is promising, the literature review revealed a limited number of high-quality research papers that directly focus on this specific intersection. Most existing studies either concentrate on general SDN environments or address QoS management without the use of AI or ML techniques. Nonetheless, this review provides valuable insights and highlights key research gaps that warrant further investigation.
 \section{Overview of Selected Papers}
 
-The selected papers cover a range of methods and applications: some focus on predicting traffic load, others on routing or load balancing. Table \ref{tab:lit-summary} categorizes these papers by their core approach and relevance to the research questions.
-
-\begin{table}[h]
-\centering
-\caption{Summary and Categorisation of Selected Literature}
-\label{tab:lit-summary}
-\begin{tabular}{|p{3.1cm}|p{3.0cm}|p{4.4cm}|p{1.8cm}|}
-\hline
-\textbf{Paper} & \textbf{Technique / Method} & \textbf{Main Focus} & \textbf{Related RQ(s)} \\
-\hline
-Rahman et al.~\cite{rahman2019autoscaling} & Random Forest, DNN & Predicting VNF requirements to maintain QoS and reduce cost & RQ1, RQ2, RQ3 \\
-\hline
-Zheng et al.~\cite{zheng2022applicationaware} & Supervised ML + QoS routing & Classifying application types and assigning QoS-based routes & RQ1, RQ2 \\
-\hline
-Dinh et al.~\cite{dinh2024safeloadbalancing} & DRL (PPO, DDPG) with CBF & Safe traffic routing using AI that respects network constraints & RQ1, RQ2 \\
-\hline
-Quang et al.~\cite{quang2023globalqos} & SABE (Queuing theory-based estimation) & Estimating available bandwidth using passive measurements & RQ2, RQ3 \\
-\hline
-Quang et al.~\cite{quang2022routing} & Centralised Optimization + QoS scheduler & Managing QoS priorities and routing using SD-WAN controller & RQ2, RQ3 \\
-\hline
-Chen et al.~\cite{chen2025mteal} & GNN + MARL & SD-WAN traffic engineering with multi-dimensional QoS metrics & RQ1, RQ2, RQ3 \\
-\hline
-\end{tabular}
-\end{table}
+The selected papers cover a range of methods and applications: some focus on predicting traffic load, others on routing or load balancing. Table~\ref{tab:lit-comparison} (Section~\ref{sec:comparative-analysis}) categorises and critically compares these papers once the discussion below has established the relevant context.
 
 \section{AI and ML Methods for QoS Prediction (RQ1)}
 
@@ -373,34 +350,38 @@ This differs from the present thesis in kind rather than in degree. The Quang et
 These findings support RQ3, confirming that automated decision support, whether optimisation-based or learned, is not only a research idea but can also be integrated into live systems if the environment supports it.
 
 \section{Comparative Analysis and Research Gaps}
-
-Rather than summarising each paper in isolation, Table~\ref{tab:lit-comparison} compares the reviewed works along the dimensions most relevant to this thesis: the data source, the modelling approach, the QoS aspect addressed, and the main limitation relative to the present work.
+\label{sec:comparative-analysis}
 
 \begin{table}[H]
 \centering
-\caption{Comparative analysis of the reviewed literature. Dataset descriptions are characterised from the cited works and should be read at the level of data \emph{type}.}
+\caption{Categorisation and comparative analysis of the reviewed literature. Dataset descriptions are characterised from the cited works and should be read at the level of data \emph{type}.}
 \label{tab:lit-comparison}
-\footnotesize
-\begin{tabular}{|p{2.1cm}|p{2.65cm}|p{2.55cm}|p{3.4cm}|}
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{|p{1.7cm}|p{2.0cm}|p{2.5cm}|p{1.0cm}|p{1.8cm}|p{2.9cm}|}
 \hline
-\textbf{Work} & \textbf{Data} & \textbf{Model} & \textbf{Gap relative to this thesis} \\
+\textbf{Work} & \textbf{Technique / Model} & \textbf{Main Focus} & \textbf{RQ(s)} & \textbf{Data} & \textbf{Gap relative to this thesis} \\
 \hline
-Rahman et al.~\cite{rahman2019autoscaling} & Private ISP traffic + modelled use case & RF + DNN & VNF autoscaling only; no per-class QoS prediction \\
+Rahman et al.~\cite{rahman2019autoscaling} & RF + DNN & Predicting VNF requirements to maintain QoS and reduce cost & RQ1--3 & Private ISP traffic + modelled use case & VNF autoscaling only; no per-class QoS prediction \\
 \hline
-Zheng et al.~\cite{zheng2022applicationaware} & Constructed traffic + SDN sim. & Supervised ML + QoS routing & Classification + routing; single metric, no class-wise error \\
+Zheng et al.~\cite{zheng2022applicationaware} & Supervised ML + QoS routing & Classifying application types and assigning QoS-based routes & RQ1, 2 & Constructed traffic + SDN sim. & Classification + routing; single metric, no class-wise error \\
 \hline
-Dinh et al.~\cite{dinh2024safeloadbalancing} & Custom flow/packet sim. & DRL (PPO/DDPG) & Control-focused; heavy compute; no interpretable prediction \\
+Dinh et al.~\cite{dinh2024safeloadbalancing} & DRL (PPO/DDPG) + CBF & Safe traffic routing respecting network constraints & RQ1, 2 & Custom flow/packet sim. & Control-focused; heavy compute; no interpretable prediction \\
 \hline
-Quang et al.~\cite{quang2023globalqos} & NS-3 packet-level sim. & SABE (queuing) + local search & Model-based estimator + optimisation, not a learned predictor; no ML/DL comparison \\
+Quang et al.~\cite{quang2023globalqos} & SABE (queuing) + local search & Estimating available bandwidth from passive measurements & RQ2, 3 & NS-3 packet-level sim. & Model-based estimator + optimisation, not a learned predictor; no ML/DL comparison \\
 \hline
-Quang et al.~\cite{quang2022routing} & NS-3 packet-level sim. & Centralised optimisation & Optimisation, not prediction; no ML model comparison \\
+Quang et al.~\cite{quang2022routing} & Centralised optimisation & Managing QoS priorities and routing via SD-WAN controller & RQ2, 3 & NS-3 packet-level sim. & Optimisation, not prediction; no ML model comparison \\
 \hline
-Chen et al.~\cite{chen2025mteal} & Public topology + sim. traffic & GNN + MARL & Complex control pipeline; not a reproducible per-class study \\
+Chen et al.~\cite{chen2025mteal} & GNN + MARL & SD-WAN traffic engineering with multi-dimensional QoS metrics & RQ1--3 & Public topology + sim. traffic & Complex control pipeline; not a reproducible per-class study \\
 \hline
-\textbf{This thesis} & \textbf{Reprod.\ sim.} & \textbf{XGBoost, MLP, FT-Transf.} & \textbf{Per-class QoS-aware evaluation + DL-vs-ML + allocation recommender} \\
+\textbf{This thesis} & \textbf{XGBoost, MLP, FT-Transf.} & \textbf{Per-class QoS delay + throughput prediction, DL-vs-ML comparison, allocation recommender} & \textbf{RQ1--3} & \textbf{Reprod.\ sim.} & \textbf{Per-class QoS-aware evaluation + DL-vs-ML + allocation recommender} \\
 \hline
 \end{tabular}
+\endgroup
 \end{table}
+
+Rather than summarising each paper in isolation, Table~\ref{tab:lit-comparison} categorises the reviewed works by technique, focus and related research question, and then critically compares them against this thesis on data source and the main limitation relative to the present work.
 
 Reading across the table, a consistent pattern emerges. Most prior works: (i) rely on private, author-constructed, or simulated traffic, and none uses a fully public, downloadable, labelled SD-WAN QoS dataset (Chen et al. use public WAN topologies only, with simulated traffic and QoS outcomes); (ii) predict or optimise a single QoS dimension rather than several; (iii) do not treat Gold/Silver/Bronze traffic classes explicitly, so class-level failures stay hidden behind global metrics; (iv) do not compare deep learning against tree-based machine learning on the same task; and (v) stop at prediction or control without connecting the model back to an explicit bandwidth-allocation decision. These five gaps directly motivate the contributions of this thesis, listed in Section~\ref{sec:contributions}: per-class QoS-aware evaluation, a reproducible simulator-generated dataset, a tree-based versus deep-learning comparison, and an AI-assisted bandwidth-allocation recommender.
 
@@ -624,7 +605,7 @@ Table~\ref{tab:zenodo_results} shows the 5G throughput results after dropping co
 \label{tab:zenodo_results}
 \begin{tabular}{|l|r|r|r|r|}
 \hline
-\textbf{Model} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & \textbf{CV $R^2$} \\
+\textbf{Model} & \textbf{MAE (Mbps)} & \textbf{RMSE (Mbps)} & \textbf{$R^2$} & \textbf{CV $R^2$} \\
 \hline
 DummyRegressor & 36.90 & 43.88 & $-$0.007 & $-$0.011 \\
 \hline
@@ -651,30 +632,34 @@ The feature set includes offered bandwidth, ToS, QoS class, routing hops, topolo
 
 \subsection{Global Model Results}
 
-Table~\ref{tab:bnnupc_global_results} shows the global BNN-UPC results on \texttt{log\_avg\_delay}.
+Table~\ref{tab:bnnupc_global_results} reports held-out results on \texttt{log\_avg\_delay}, with MAE also converted to milliseconds; Table~\ref{tab:per_class_results} instead uses five-fold out-of-fold predictions, so the two are descriptively, not protocol-identically, comparable.
 
 \begin{table}[H]
 \centering
 \caption{BNN-UPC Global Results (Target: \texttt{log\_avg\_delay})}
 \label{tab:bnnupc_global_results}
-\begin{tabular}{|l|r|r|r|r|}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{|l|r|r|r|r|r|}
 \hline
-\textbf{Model} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & \textbf{CV $R^2$} \\
+\textbf{Model} & \textbf{MAE (log)} & \textbf{MAE (ms)} & \textbf{RMSE (log)} & \textbf{$R^2$ (log)} & \textbf{CV $R^2$ (log)} \\
 \hline
-Linear Regression & 0.227 & 0.415 & 0.685 & 0.690 \\
+Linear Regression & 0.227 & 15.88 & 0.415 & 0.685 & 0.690 \\
 \hline
-SVR (RBF) & 0.174 & 0.391 & 0.721 & 0.721 \\
+SVR (RBF) & 0.174 & 13.56 & 0.391 & 0.721 & 0.721 \\
 \hline
-Random Forest & 0.181 & 0.364 & 0.758 & 0.764 \\
+Random Forest & 0.181 & 13.42 & 0.364 & 0.758 & 0.764 \\
 \hline
-XGBoost & 0.185 & 0.359 & 0.765 & 0.766 \\
+XGBoost & 0.185 & 13.52 & 0.359 & 0.765 & 0.766 \\
 \hline
-PyTorch MLP & 0.185 & 0.357 & 0.766 & 0.769 \\
+PyTorch MLP & 0.185 & 13.67 & 0.357 & 0.766 & 0.769 \\
 \hline
 \end{tabular}
+\endgroup
 \end{table}
 
-The PyTorch MLP is marginally ahead of XGBoost on the global score, but the difference is very small and within cross-validation noise: the five-fold cross-validated $R^2$ is $0.766 \pm 0.008$ for XGBoost and $0.769 \pm 0.008$ for the MLP (mean $\pm$ standard deviation across folds). The fold-level variability is much larger than the mean difference. This means the neural-network path is competitive, while XGBoost remains an important explainable tree-based baseline for this tabular dataset. The useful comparison is therefore not only which model has the highest global score, but also whether the MLP and XGBoost behave similarly for each QoS class. Section~\ref{sec:significance} tests this difference formally.
+The PyTorch MLP is marginally ahead of XGBoost on the global score, but the difference is very small and within cross-validation noise: the five-fold cross-validated $R^2$ is $0.766 \pm 0.008$ for XGBoost and $0.769 \pm 0.008$ for the MLP (mean $\pm$ standard deviation across folds). The fold-level variability is much larger than the mean difference. This means the neural-network path is competitive, while XGBoost remains an important explainable tree-based baseline for this tabular dataset. By MAE in milliseconds the ranking flips: XGBoost (13.52\,ms) edges out the MLP (13.67\,ms), which further supports that the two models are practically equivalent rather than one being clearly superior. The useful comparison is therefore not only which model has the highest global score, but also whether the MLP and XGBoost behave similarly for each QoS class. Section~\ref{sec:significance} tests this difference formally.
 
 \section{QoS-Aware Evaluation}
 
@@ -684,23 +669,27 @@ Therefore, the XGBoost model was evaluated using out-of-fold predictions and sli
 
 \subsection{Per-Class Results}
 
-Table~\ref{tab:per_class_results} shows per-class results. The metric values are on the delay scale in milliseconds, except $R^2$, which is computed on the log-delay target.
+Table~\ref{tab:per_class_results} shows per-class results from five-fold out-of-fold predictions; MAE is given in both scales, RMSE and $R^2$ remain log-delay, and RMSLE adds a proportional delay-scale error.
 
 \begin{table}[H]
 \centering
 \caption{BNN-UPC Per-Class Evaluation using XGBoost}
 \label{tab:per_class_results}
-\begin{tabular}{|l|r|r|r|r|}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{|l|r|r|r|r|r|r|}
 \hline
-\textbf{QoS Class} & \textbf{Rows} & \textbf{MAE Delay} & \textbf{RMSLE} & \textbf{$R^2$ Log Delay} \\
+\textbf{QoS Class} & \textbf{Rows} & \textbf{MAE (log)} & \textbf{MAE (ms)} & \textbf{RMSE (log)} & \textbf{RMSLE} & \textbf{$R^2$ (log)} \\
 \hline
-Gold & 4,592 & 3.05 ms & 0.160 & 0.914 \\
+Gold & 4,592 & 0.098 & 3.05 & 0.165 & 0.160 & 0.914 \\
 \hline
-Silver & 8,991 & 3.48 ms & 0.168 & 0.908 \\
+Silver & 8,991 & 0.111 & 3.48 & 0.175 & 0.168 & 0.908 \\
 \hline
-Bronze & 15,697 & 20.68 ms & 0.451 & 0.704 \\
+Bronze & 15,697 & 0.250 & 20.68 & 0.459 & 0.451 & 0.704 \\
 \hline
 \end{tabular}
+\endgroup
 \end{table}
 
 The practical implication is significant. Gold and Silver, the classes that carry the most SLA-sensitive traffic, are predicted accurately ($R^2 = 0.914$ and $0.908$), so the model is most reliable exactly where reliability matters most. Bronze, a best-effort class, is much harder ($R^2 = 0.704$) because its delay is dominated by transient queue contention rather than by the static configuration the model can observe (this mechanism is analysed in Chapter~\ref{chap:discussion}). Crucially, a single global score would have hidden this gap; only per-class evaluation exposes it, which is why QoS-aware evaluation is essential for SD-WAN rather than an optional extra.
@@ -713,19 +702,23 @@ Table~\ref{tab:scenario_results} shows that the mixed-policy scenario is the har
 \centering
 \caption{BNN-UPC Scenario-Specific Evaluation using XGBoost}
 \label{tab:scenario_results}
-\begin{tabular}{|l|r|r|r|}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{|l|r|r|r|r|r|}
 \hline
-\textbf{Scenario} & \textbf{Rows} & \textbf{MAE Delay} & \textbf{$R^2$ Log Delay} \\
+\textbf{Scenario} & \textbf{Rows} & \textbf{MAE (log)} & \textbf{MAE (ms)} & \textbf{RMSE (log)} & \textbf{$R^2$ (log)} \\
 \hline
-A\_wfq\_fixed & 6,560 & 6.16 ms & 0.796 \\
+A\_wfq\_fixed & 6,560 & 0.157 & 6.16 & 0.264 & 0.796 \\
 \hline
-B\_wfq\_profiles & 8,240 & 12.01 ms & 0.758 \\
+B\_wfq\_profiles & 8,240 & 0.186 & 12.01 & 0.359 & 0.758 \\
 \hline
-C\_mixed\_policy & 7,600 & 21.32 ms & 0.743 \\
+C\_mixed\_policy & 7,600 & 0.228 & 21.32 & 0.443 & 0.743 \\
 \hline
-D\_mixed\_equal & 6,880 & 9.95 ms & 0.779 \\
+D\_mixed\_equal & 6,880 & 0.156 & 9.95 & 0.319 & 0.779 \\
 \hline
 \end{tabular}
+\endgroup
 \end{table}
 
 Table~\ref{tab:policy_results} shows results sliced by scheduling policy. Strict Priority (SP) achieves the best $R^2$ because SP flows follow a deterministic priority order that the model can learn well. WFQ is harder because queue weights vary across profiles and interact with traffic load in more complex ways.
@@ -734,18 +727,24 @@ Table~\ref{tab:policy_results} shows results sliced by scheduling policy. Strict
 \centering
 \caption{BNN-UPC Scheduling Policy Evaluation using XGBoost (v1 Dataset). Policies: SP (Strict Priority), DRR (Deficit Round Robin), WFQ (Weighted Fair Queueing).}
 \label{tab:policy_results}
-\begin{tabular}{|l|r|r|r|r|}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{|l|r|r|r|r|r|r|}
 \hline
-\textbf{Policy} & \textbf{Rows} & \textbf{MAE (ms)} & \textbf{RMSLE} & \textbf{$R^2$} \\
+\textbf{Policy} & \textbf{Rows} & \textbf{MAE (log)} & \textbf{MAE (ms)} & \textbf{RMSE (log)} & \textbf{RMSLE} & \textbf{$R^2$} \\
 \hline
-SP & 8,120 & 8.27 & 0.282 & 0.806 \\
+SP & 8,120 & 0.140 & 8.27 & 0.288 & 0.282 & 0.806 \\
 \hline
-DRR & 1,840 & 8.01 & 0.302 & 0.678 \\
+DRR & 1,840 & 0.164 & 8.01 & 0.308 & 0.302 & 0.678 \\
 \hline
-WFQ & 19,320 & 14.90 & 0.378 & 0.756 \\
+WFQ & 19,320 & 0.203 & 14.90 & 0.385 & 0.378 & 0.756 \\
 \hline
 \end{tabular}
+\endgroup
 \end{table}
+
+DRR shows the opposite pattern: lowest MAE (8.01\,ms) but lowest $R^2$ (0.678), since $R^2$ reflects variance explained within its own class, not absolute error.
 
 \begin{figure}[H]
 \centering
