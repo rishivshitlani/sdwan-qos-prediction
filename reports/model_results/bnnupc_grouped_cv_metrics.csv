@@ -1,0 +1,9 @@
+run_timestamp,evaluation,model,target,qos_class,rows,mae_ms,r2,cv_folds
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,delay_p90,Overall,29280,32.51253962232519,0.2930838367895223,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,delay_p90,Gold,4592,8.920553391015389,0.5498728724031112,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,delay_p90,Silver,8991,10.86909612004764,0.4898079120926381,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,delay_p90,Bronze,15697,51.81117001686887,0.2691270335159257,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,jitter,Overall,29280,3.2229361073017797,-0.039608143563327536,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,jitter,Gold,4592,0.5096941169073018,-7.554768103161884,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,jitter,Silver,8991,1.013328034308359,-13.182080595725902,5
+2026-08-08T09:30:04,GroupKFold_by_simulation_id,XGBRegressor,jitter,Bronze,15697,5.282297348569237,-0.034099451636182776,5

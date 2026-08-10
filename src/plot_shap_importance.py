@@ -24,6 +24,8 @@ import shap
 from train_baseline import build_model_specs, build_preprocessor
 from evaluate_bnnupc_qos_slices import load_bnnupc_dataset, split_features_and_target
 
+matplotlib.rcParams["pdf.fonttype"] = 42
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "bnnupc_qos_dataset.csv"
 FIGDIR = PROJECT_ROOT / "MSc AI-DA-AI Online Thesis Document" / "Figures"

@@ -310,14 +310,19 @@ def train_delay_model(
         test_size=0.20,
         random_state=random_state,
     )
-    pipeline = build_xgboost_pipeline(features, random_state=random_state)
-    pipeline.fit(x_train, y_train)
-    predictions = pipeline.predict(x_test)
+    evaluation_pipeline = build_xgboost_pipeline(features, random_state=random_state)
+    evaluation_pipeline.fit(x_train, y_train)
+    predictions = evaluation_pipeline.predict(x_test)
     metrics = {
         "holdout_rmse_log_delay": float(np.sqrt(mean_squared_error(y_test, predictions))),
         "holdout_r2_log_delay": float(r2_score(y_test, predictions)),
     }
-    return pipeline, metrics
+
+    # Once the holdout diagnostic has been recorded, refit the operational
+    # surrogate on all available rows before scoring candidate allocations.
+    final_pipeline = build_xgboost_pipeline(features, random_state=random_state)
+    final_pipeline.fit(features, target)
+    return final_pipeline, metrics
 
 
 def recommend_allocations(
