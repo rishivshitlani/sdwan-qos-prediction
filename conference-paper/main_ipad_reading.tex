@@ -1,4 +1,19 @@
-\documentclass[conference]{IEEEtran}
+\documentclass[12pt,onecolumn]{IEEEtran}
+
+% Reading copy only -- single column, larger font, for comfortable viewing
+% on an 11-inch iPad. Not the submission version; see main.tex for that.
+\usepackage[margin=0.9in]{geometry}
+
+% Match the thesis: plain Computer Modern instead of IEEEtran's default Times.
+\renewcommand{\rmdefault}{cmr}
+\renewcommand{\sfdefault}{cmss}
+\renewcommand{\ttdefault}{cmtt}
+
+% Bump the base text size beyond IEEEtran's 12pt ceiling for easier reading.
+\makeatletter
+\renewcommand{\normalsize}{\@setfontsize{\normalsize}{14}{17}}
+\normalsize
+\makeatother
 
 \usepackage{amsmath}
 \usepackage{booktabs}
@@ -12,9 +27,9 @@
 
 \title{Simulation-Grouped Per-Class QoS Prediction for SD-WAN}
 
-\author{\IEEEauthorblockN{Radhika (Rishiv) Shitlani}
-\IEEEauthorblockA{School of Computer Science\\
-University of Galway, Galway, Ireland}}
+\author{Radhika (Rishiv) Shitlani\\
+School of Computer Science\\
+University of Galway, Galway, Ireland}
 
 \begin{document}
 
@@ -118,7 +133,7 @@ Grouped by run   & 0.747 & 0.907 & 0.898 & 0.680 \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/validation_sensitivity.pdf}
+\includegraphics[width=0.8\textwidth]{figures/validation_sensitivity.pdf}
 \caption{Row-wise and simulation-grouped performance by QoS class.}
 \label{fig:sensitivity}
 \end{figure}
@@ -150,7 +165,7 @@ SHAP values for the final XGBoost model back this up (Fig.~\ref{fig:shap}). Rout
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/shap_summary.pdf}
+\includegraphics[width=0.85\textwidth]{figures/shap_summary.pdf}
 \caption{SHAP summary for the XGBoost log-delay model; colour denotes feature value.}
 \label{fig:shap}
 \end{figure}
@@ -193,7 +208,6 @@ Several limitations should temper these claims. First, the data is simulator-gen
 
 This paper presented a simulation-grouped, per-class evaluation of QoS prediction for SD-WAN-like networks. XGBoost generalises well to unseen simulation runs for Gold and Silver mean delay, is noticeably less reliable for Bronze, and does not generalise for jitter at all. Row-wise cross-validation overstates how well the model actually performs, which confirms that the simulation run, not the individual flow, has to be the unit of evaluation. The broader point is a simple one: trustworthy AI-assisted QoS prediction needs class-aware metrics, group-safe validation, and an honest account of what static network features can and cannot support.
 
-\IEEEtriggeratref{3}
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 
