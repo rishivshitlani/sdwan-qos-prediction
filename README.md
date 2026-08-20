@@ -1,300 +1,173 @@
 # AI-Driven QoS Prediction in SD-WAN Networks
 
-This repository contains the implementation work for my MSc AI capstone project: **AI-Driven QoS Prediction in SD-WAN Networks**.
+This repository contains the code, processed experiment data, results, thesis material, and conference paper for an MSc Artificial Intelligence project on quality-of-service (QoS) prediction in software-defined wide area networks (SD-WANs).
 
-The project explores how machine learning and deep learning models can predict QoS-related network performance and support SD-WAN-style bandwidth decisions from traffic load, network configuration, and flow-level measurements.
+The current primary experiment uses packet-level simulations from **BNNetSimulator** to predict per-flow delay for Gold, Silver, and Bronze traffic. The evaluation is grouped by simulation run so that related flows from the same run cannot appear in both training and validation data.
 
-## Project Aim
+## Research Focus
 
-The aim of this project is to evaluate whether AI models can predict QoS outcomes such as achieved throughput, jitter, and packet loss based on network conditions and configuration.
+The project investigates three connected questions:
 
-The prediction task is treated as a **supervised regression problem**.
+1. How accurately can machine-learning models predict continuous QoS outcomes for different traffic classes?
+2. How does evaluation design, particularly row-wise versus simulation-grouped validation, affect the reported performance?
+3. Can predicted QoS support SD-WAN decisions such as SLA-risk detection and candidate WFQ bandwidth allocation?
 
-The current research direction has two connected stages:
+The main supervised-learning target is `log_avg_delay`, the natural logarithm of average per-flow delay. Secondary targets include 90th-percentile delay (`delay_p90`) and jitter.
 
-1. Predict observed QoS outcomes from public network datasets.
-2. Use those predictions to explore **Option 2 targets**, where bandwidth recommendation is treated as an optimisation-derived label that reduces SLA violations under link-capacity constraints.
+## Current Headline Results
 
-This keeps the first modelling stage reproducible while still moving the thesis toward a more SD-WAN-relevant decision target.
+The primary dataset contains **29,280 flows from 400 simulation runs**:
 
-## Research Questions
+| QoS class | Flows | Grouped log-delay R² | Delay MAE | SLA F1 |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 4,592 | 0.907 | 3.17 ms | 0.940 |
+| Silver | 8,991 | 0.898 | 3.67 ms | 0.680 |
+| Bronze | 15,697 | 0.680 | 21.57 ms | 0.554 |
+| Overall | 29,280 | 0.747 | 13.19 ms | — |
 
-1. What types of AI or ML techniques are currently or can be used for predicting QoS in SD-WAN?
-2. What are the benefits and limitations of these approaches in terms of prediction accuracy, scalability, and real-world use?
-3. How can QoS prediction be effectively integrated into SD-WAN production environments to improve network performance?
+These values come from five-fold `sklearn.model_selection.GroupKFold` evaluation using `simulation_id` as the grouping key. The identifier is used only to define folds and is excluded from model inputs.
+
+A shuffled row-wise comparison produces a modestly higher overall R² of 0.766. The difference supports treating the simulation run, rather than an individual flow row, as the evaluation unit when flows from a run share topology, load, and scheduler context.
+
+Under the same grouped protocol:
+
+- 90th-percentile delay is moderately predictable overall (R² = 0.293).
+- Jitter is not predicted reliably by the static feature set (R² = -0.040).
+- Gold SLA alerts have 0.986 precision: 1,184 of 1,201 predicted violations are true violations.
+
+The complete discussion and limitations are available in the [conference paper](output/pdf/SSGP26_SD-WAN_QoS_Paper_Draft.pdf). A [single-column reading version](output/pdf/SSGP26_SD-WAN_QoS_Paper_iPad_Reading.pdf) is also provided.
 
 ## Repository Structure
 
 ```text
 sdwan-qos-prediction/
-|
+├── conference-paper/        IEEE-style paper source, figures, and build output
 ├── data/
-│   ├── raw/
-│   │   ├── Zenodo_13754300/
-│   │   ├── BNN_UPC/
-│   │   └── cicids/
-│   │       └── MachineLearningCVE/
-│   ├── processed/
-│   │   └── cleaned/
-│   └── synthetic/
-│       └── sdwan_qos_synthetic.csv
-|
-├── src/
-│   ├── generate_dataset.py
-│   ├── initial_data_set_exploration.py
-│   ├── process_zenodo_dataset.py
-│   ├── process_public_dataset.py
-│   ├── clean_public_dataset.py
-│   ├── create_cicids_project_aligned_sample.py
-│   ├── generate_bnnupc_dataset.py
-│   ├── process_bnnupc_dataset.py
-│   ├── train_baseline.py
-│   ├── train_bnnupc_mlp.py
-│   ├── train_bnnupc_ft_transformer.py
-│   ├── evaluate_bnnupc_qos_slices.py
-│   ├── evaluate_bnnupc_ft_transformer_slices.py
-│   ├── evaluate_bnnupc_bronze_loss_classifier.py
-│   └── recommend_qos_allocation.py
-|
-├── notebooks/
-├── documents/
-│   ├── model_explanation.md
-│   └── qos_classes.md
-├── reports/
-├── figures/
-├── models/
+│   ├── raw/                 source datasets and BNNetSimulator inputs/results
+│   ├── processed/           project-aligned datasets
+│   └── synthetic/           generated SD-WAN-style data
+├── documents/               QoS-class and model documentation
+├── MSc AI-DA-AI Online Thesis Document/
+│                            thesis source, figures, bibliography, and PDF
+├── output/pdf/              stable paper PDFs for reading and distribution
+├── reports/model_results/   curated experiment metrics and recommendations
+├── src/                     generation, processing, modelling, and evaluation
 ├── requirements.txt
-├── .gitignore
 └── README.md
 ```
 
-Most raw/processed data files, the virtual environment, and model artifacts are ignored by Git. Curated report CSVs under `reports/model_results/` can be committed when they document a meaningful experiment.
+Large raw datasets, the virtual environment, and most generated model artifacts are intentionally excluded from Git. Curated experiment CSVs under `reports/model_results/` are retained when they support the reported analysis.
 
-## Report CSVs
+## Setup
 
-Use `reports/model_results/` as the canonical location for experiment outputs. The folder-level guide at `reports/model_results/README.md` explains which CSV is which, where the FT-Transformer rows are stored, and which files are most relevant for the thesis.
-
-## Datasets
-
-This project currently supports four dataset paths:
-
-1. A synthetic SD-WAN-like dataset generated by `src/generate_dataset.py`
-2. Zenodo 5G campus network QoS dataset stored under `data/raw/Zenodo_13754300`
-3. BNN-UPC-style QoS simulation data generated locally with BNNetSimulator under `data/raw/BNN_UPC`
-4. Public flow datasets stored under `data/raw`, currently CICIDS2017 `MachineLearningCVE`
-
-The current main public dataset direction is the Zenodo 5G campus network dataset because it contains QoS-relevant measurements directly: offered throughput, achieved throughput, jitter, packet loss, radio bandwidth, slot configuration, uplink/downlink direction, and testbed metadata.
-
-BNN-UPC is now integrated as the topology-aware QoS experiment. Because the original BNN-UPC Challenge 2020 downloads are unavailable, this project generates equivalent BNNetSimulator input files locally, runs the official Docker simulator, processes the compressed simulation outputs, and trains models on per-flow delay targets. The main target for this branch is `log_avg_delay`, which stabilises the heavy-tailed delay distribution under congestion.
-
-MAWI remains a candidate public dataset for a later research stage. It will be assessed separately because it has a different packet/flow structure and may require different feature extraction methods.
-
-CICIDS2017 is retained for exploration only. It is an intrusion-detection dataset, not a QoS dataset, so any SD-WAN-style mapping from CICIDS fields is a proxy and must be treated carefully in the thesis.
-
-Future datasets such as MAWI, UNIBS-2009, or Kaggle network-flow datasets should be added as separate folders under `data/raw`.
-
-Example:
-
-```text
-data/raw/
-├── cicids/
-├── mawi/
-├── unibs/
-└── kaggle_netflow/
-```
-
-The generic processing scripts treat each top-level folder inside `data/raw` as a separate dataset. They do not merge different datasets together.
-
-For example, files inside `data/raw/cicids/` are processed together as the `cicids` dataset, while future folders such as `data/raw/mawi/` or `data/raw/unibs/` will receive their own reports and cleaned outputs.
-
-## Dataset Notes
-
-Dataset-specific feature definitions are documented next to each dataset instead of in this main project README:
-
-```text
-data/raw/Zenodo_13754300/README.md
-data/raw/BNN_UPC/README.md
-data/raw/cicids/README.md
-data/synthetic/README.md
-```
-
-For Zenodo, the recommended first modelling target is `actual_throughput_mbps`. `recommended_bandwidth_percent` is still produced as an optional derived target, but `actual_throughput_mbps` must be dropped from model inputs when that target is used.
-
-QoS class definitions and port/protocol mappings are documented separately in:
-
-```text
-documents/qos_classes.md
-```
-
-The initial class policy uses Gold, Silver, and Bronze traffic classes. These classes can later be used as weights or constraints when deriving Option 2 bandwidth-allocation targets.
-
-## Scripts
-
-### Generate Synthetic SD-WAN Data
+Python 3.10 or newer is recommended. Always run the project through its virtual environment.
 
 ```bash
-.venv/bin/python src/generate_dataset.py
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-This creates:
+Docker Desktop is additionally required to generate packet-level results with BNNetSimulator.
 
-```text
-data/synthetic/sdwan_qos_synthetic.csv
-```
-
-The synthetic dataset contains SD-WAN-style features and a rule-based `recommended_bandwidth_percent` target.
-
-### Explore Zenodo Dataset
+To check the Python sources:
 
 ```bash
-.venv/bin/python src/initial_data_set_exploration.py
+.venv/bin/python -m py_compile src/*.py
 ```
 
-This script focuses on:
+## Primary BNN-UPC Workflow
 
-```text
-data/raw/Zenodo_13754300/
-```
-
-It reads only the first few rows of each raw CSV and counts rows safely, so it can inspect the large packet-level files without loading them fully into memory.
-
-It reports:
-
-* File shape
-* Column names
-* Column data types
-* First 5 rows
-
-### Process Zenodo Dataset
+### 1. Generate BNNetSimulator inputs
 
 ```bash
-.venv/bin/python src/process_zenodo_dataset.py --skip-owd
+.venv/bin/python src/generate_bnnupc_dataset.py \
+  --n-topologies 20 \
+  --n-tms-per-topology 20 \
+  --net-size-min 6 \
+  --net-size-max 12
 ```
 
-This creates:
+This produces topology, routing, traffic-matrix, configuration, and manifest files under:
 
 ```text
-data/processed/zenodo_13754300_project_aligned.csv
+data/raw/BNN_UPC/sim_input/
 ```
 
-The quick `--skip-owd` mode uses the two throughput files only:
+The default experiment creates 20 topologies and 20 traffic matrices per topology, giving 400 simulation runs. Generation is deterministic for a fixed random seed.
 
-```text
-ntnu_tput_all_Throughput.csv
-wue_tput_all_Throughput.csv
-```
-
-It splits each raw row into separate uplink and downlink records and maps the data into the project feature schema.
-
-The script can also aggregate the large one-way-delay packet files if `--skip-owd` is omitted. That mode may take several minutes because it reads roughly 24 million packet rows.
-
-### Understand Public Datasets
+### 2. Run BNNetSimulator
 
 ```bash
-.venv/bin/python src/process_public_dataset.py
-```
-
-This scans supported tabular datasets under:
-
-```text
-data/raw/
-```
-
-Supported formats:
-
-```text
-.csv, .tsv, .txt, .json, .jsonl, .ndjson, .parquet
-```
-
-For each dataset, it counts:
-
-* Rows
-* Files
-* Features
-* Labels
-* Missing values
-* Infinite values
-* Numeric min, max, and mean
-
-It writes:
-
-```text
-data/processed/public_datasets_dataset_understanding_report.xlsx
-data/processed/public_datasets_<dataset>_labels_features_counts.csv
-data/processed/public_datasets_<dataset>_label_counts.csv
-data/processed/public_datasets_file_errors.csv
-```
-
-The Excel report contains a separate tab for each dataset plus a `file_errors` tab.
-
-### Clean Public Datasets
-
-```bash
-.venv/bin/python src/clean_public_dataset.py
-```
-
-This performs reusable cleaning for each dataset under `data/raw`.
-
-It:
-
-* Detects the label column automatically where possible
-* Removes constant-zero numeric features
-* Replaces infinite values with missing values
-* Drops rows with missing or infinite-derived values by default
-* Reports whether the label distribution is imbalanced
-* Writes a separate cleaned CSV for each dataset
-
-Outputs:
-
-```text
-data/processed/cleaned/<dataset>_cleaned.csv
-data/processed/public_datasets_cleaning_summary.csv
-data/processed/public_datasets_removed_constant_zero_features.csv
-data/processed/public_datasets_cleaned_label_counts.csv
-data/processed/public_datasets_cleaning_report.xlsx
-```
-
-### Create CICIDS Project-Aligned Sample
-
-```bash
-.venv/bin/python src/create_cicids_project_aligned_sample.py
-```
-
-This creates an SD-WAN-style sample from CICIDS2017 flow CSVs:
-
-```text
-data/processed/cicids2017_project_aligned_sample.csv
-```
-
-Some CICIDS values are proxies because CICIDS2017 does not directly contain SD-WAN QoS fields. See `data/raw/cicids/README.md` for the raw and project-aligned feature definitions.
-
-### Generate and Process BNN-UPC QoS Data
-
-```bash
-.venv/bin/python src/generate_bnnupc_dataset.py
 docker run --rm \
   --mount type=bind,src=$(pwd)/data/raw/BNN_UPC/sim_input,dst=/data \
   bnnupc/bnnetsimulator
+```
+
+The official container writes compressed per-flow simulation results beneath `data/raw/BNN_UPC/sim_input/results/`.
+
+### 3. Process the simulation results
+
+```bash
 .venv/bin/python src/process_bnnupc_dataset.py
 ```
 
-This creates a topology-aware per-flow QoS dataset:
+Output:
 
 ```text
 data/processed/bnnupc_qos_dataset.csv
 ```
 
-The processed table includes traffic class (`qos_class`), offered bandwidth, time distribution, routing hops, topology size, scheduling policy, queue weights, and delay/loss targets. The QoS mapping follows BNNetSimulator ToS values:
+Each row represents one source-destination flow. The processed features include traffic class, offered bandwidth, traffic distribution, route length, topology size, link properties, scheduling policy, and queue weights. Outcome columns include average delay, delay percentiles, jitter, packet loss, and achieved bandwidth.
 
-```text
-ToS 0 = Gold
-ToS 1 = Silver
-ToS 2 = Bronze
+BNNetSimulator ToS values are mapped as follows:
+
+| ToS | QoS class | Priority |
+| ---: | --- | --- |
+| 0 | Gold | Highest |
+| 1 | Silver | Medium |
+| 2 | Bronze | Lowest |
+
+### 4. Run the primary grouped evaluation
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_grouped_cv.py
 ```
 
-### Train BNN-UPC Baselines, MLP, and FT-Transformer
+Output:
 
-The tree/SVR/linear baselines can be run through the generic trainer:
+```text
+reports/model_results/bnnupc_grouped_cv_xgb.csv
+```
+
+The evaluator trains XGBoost on `log_avg_delay`, creates out-of-fold predictions with `GroupKFold`, and reports overall and per-class regression and SLA-trigger metrics. The row-wise sensitivity results are produced separately by `evaluate_bnnupc_qos_slices.py`.
+
+### 5. Evaluate tail delay and jitter with the same folds
+
+```bash
+.venv/bin/python src/evaluate_bnnupc_grouped_metrics.py
+```
+
+Output:
+
+```text
+reports/model_results/bnnupc_grouped_cv_metrics.csv
+```
+
+### 6. Generate SHAP and thesis figures
+
+```bash
+.venv/bin/python src/plot_shap_importance.py
+.venv/bin/python src/plot_thesis_figures.py
+```
+
+These scripts write publication figures to the thesis figure directory. The SHAP plots describe model associations, not causal effects.
+
+## Additional Model Comparisons
+
+### Classical models
+
+The generic trainer supports leakage-safe preprocessing for linear regression, SVR, random forest, and XGBoost:
 
 ```bash
 .venv/bin/python src/train_baseline.py \
@@ -313,165 +186,61 @@ The tree/SVR/linear baselines can be run through the generic trainer:
   --drop-column actual_bandwidth
 ```
 
-The PyTorch feedforward neural network uses the same leakage-safe feature set:
+### Neural tabular models
 
 ```bash
 .venv/bin/python src/train_bnnupc_mlp.py
-```
-
-Output:
-
-```text
-reports/model_results/bnnupc_mlp_log_delay_results.csv
-```
-
-The FT-Transformer is an attention-based tabular comparator. It tokenises
-numeric and categorical BNN-UPC features, applies self-attention across feature
-tokens, and predicts the same `log_avg_delay` target:
-
-```bash
 .venv/bin/python src/train_bnnupc_ft_transformer.py
 ```
 
-Output:
+Class- and policy-aware comparisons can be produced with:
 
-```text
-reports/model_results/bnnupc_ft_transformer_log_delay_results.csv
+```bash
+.venv/bin/python src/evaluate_bnnupc_mlp_slices.py
+.venv/bin/python src/evaluate_bnnupc_ft_transformer_slices.py
 ```
 
-This standalone training report is generated only when `src/train_bnnupc_ft_transformer.py` is run. The currently checked-in FT-Transformer evaluation rows are in the shared QoS reports; see `reports/model_results/README.md` for the exact file map and current summary.
+The existing neural comparisons use row-wise outer folds and are therefore supporting sensitivity results, not substitutes for the primary simulation-grouped estimate.
 
-Training scripts append new timestamped rows to existing report CSVs instead of overwriting them. This keeps repeated experiments in one report file.
+## SLA and QoS-Slice Evaluation
 
-### Evaluate BNN-UPC by QoS Class and Policy
-
-For QoS-aware evaluation, do not rely only on one global CV R² or MAE. The BNN-UPC evaluator creates out-of-fold predictions and slices errors by QoS class, scheduling scenario, and scheduling policy:
+The general slice evaluator reports metrics by class, scenario, and scheduling policy:
 
 ```bash
 .venv/bin/python src/evaluate_bnnupc_qos_slices.py
 ```
 
-Outputs:
+Default experimental SLA thresholds are:
 
 ```text
-reports/model_results/bnnupc_qos_slice_evaluation.csv
-reports/model_results/bnnupc_sla_violation_precision.csv
+Gold:   30 ms
+Silver: 50 ms
+Bronze: 60 ms
 ```
 
-The default model is XGBoost on `log_avg_delay`. The evaluator reports per-class MAE/RMSE/RMSLE, scenario-specific R², policy-specific R², and SLA violation precision using default thresholds:
-
-```text
-Gold > 30 ms
-Silver > 50 ms
-Bronze > 60 ms
-```
-
-Additional models can be evaluated with repeated `--model` flags:
+These thresholds are research operating points, not contractual SLA values. The Bronze threshold can be examined with a sensitivity sweep:
 
 ```bash
-.venv/bin/python src/evaluate_bnnupc_qos_slices.py \
-  --model LinearRegression \
-  --model SVR_rbf \
-  --model RandomForestRegressor \
-  --model XGBRegressor
+.venv/bin/python src/evaluate_bnnupc_qos_slices.py --bronze-sweep
 ```
 
-### Evaluate PyTorch MLP by QoS Class and Policy
-
-The PyTorch MLP can be evaluated with the same out-of-fold QoS slices and SLA trigger metrics used for XGBoost:
+Bronze packet-loss risk can be evaluated separately:
 
 ```bash
-.venv/bin/python src/evaluate_bnnupc_mlp_slices.py
+.venv/bin/python src/evaluate_bnnupc_bronze_loss_classifier.py
 ```
 
-Outputs:
+Gold and Silver loss events are too rare in the current dataset for a meaningful equivalent classifier.
 
-```text
-reports/model_results/bnnupc_qos_slice_evaluation.csv
-reports/model_results/bnnupc_sla_violation_precision.csv
-```
+## Experimental Layer 3 Allocation Recommender
 
-The MLP evaluator appends `PyTorchMLP` rows to the same report files so the per-class delay and SLA metrics can be compared directly with XGBoost.
-
-### Evaluate FT-Transformer by QoS Class and Policy
-
-The FT-Transformer evaluator uses the same outer out-of-fold split and the same
-QoS/SLA metric functions as the XGBoost and MLP evaluators. Within each training
-fold it uses a small validation split for early stopping:
-
-```bash
-.venv/bin/python src/evaluate_bnnupc_ft_transformer_slices.py
-```
-
-Outputs:
-
-```text
-reports/model_results/bnnupc_qos_slice_evaluation.csv
-reports/model_results/bnnupc_sla_violation_precision.csv
-```
-
-The evaluator appends `FTTransformer` rows to the shared reports. Current results make FT-Transformer useful as an attention-based comparison point, but not stronger than the simpler MLP/XGBoost baselines on this tabular feature set. See `reports/model_results/README.md` for the current FT-Transformer metrics and SLA-trigger report locations.
-
-### Evaluate Additional BNN-UPC QoS Metrics
-
-Manzoor's feedback was that each QoS metric should be evaluated with its own
-class-aware metrics, not only one global CV R². The additional metric evaluator
-currently runs XGBoost on `jitter` and `delay_p90`:
-
-```bash
-.venv/bin/python src/evaluate_bnnupc_metric_slices.py
-```
-
-Output:
-
-```text
-reports/model_results/bnnupc_metric_slice_evaluation.csv
-```
-
-The report is appended on each run and includes overall, per-class, scenario,
-and scheduling-policy slices. It reports MAE/RMSE in the native target unit,
-MAE/RMSE/RMSLE after scaling to milliseconds, and R² for each target.
-
-Current XGBoost per-class results show that `delay_p90` is learnable for Gold
-and Silver, while `jitter` is harder to evaluate with R² because Gold and
-Silver jitter values are very small and low-variance:
-
-| Target | QoS class | MAE | RMSE | RMSLE | R² |
-| --- | --- | ---: | ---: | ---: | ---: |
-| `jitter` | Gold | 0.54 ms | 2.31 ms | 0.369 | -9.201 |
-| `jitter` | Silver | 1.01 ms | 4.25 ms | 0.474 | -15.670 |
-| `jitter` | Bronze | 4.89 ms | 27.76 ms | 0.995 | 0.035 |
-| `delay_p90` | Gold | 8.30 ms | 17.68 ms | 0.252 | 0.611 |
-| `delay_p90` | Silver | 10.06 ms | 19.50 ms | 0.305 | 0.566 |
-| `delay_p90` | Bronze | 47.32 ms | 127.79 ms | 0.617 | 0.340 |
-
-### Recommend Layer 3 QoS Bandwidth Allocation
-
-The allocation recommender uses the trained BNN-UPC log-delay relationship to test candidate WFQ weight profiles and recommend how bandwidth should be split across Gold, Silver, and Bronze traffic:
+The project also contains a what-if recommender for candidate WFQ class weights:
 
 ```bash
 .venv/bin/python src/recommend_qos_allocation.py
 ```
 
-Default candidate profiles:
-
-```text
-60/30/10
-50/40/10
-33/33/34
-25/65/10
-80/15/5
-```
-
-Default SLA thresholds:
-
-```text
-Gold < 20 ms
-Silver < 50 ms
-Bronze < 100 ms
-```
-
-The script trains an XGBoost `log_avg_delay` model, rewrites the candidate WFQ class weights into the traffic pattern, predicts class-level delay, and ranks profiles by SLA feasibility and weighted violation score.
+It scores candidate Gold/Silver/Bronze profiles by predicted class delay, SLA feasibility, and weighted violation cost. This is an experimental extension built on model predictions; it is not part of the conference paper's reported contributions and is not a production SD-WAN controller.
 
 Output:
 
@@ -479,325 +248,69 @@ Output:
 reports/model_results/bnnupc_qos_allocation_recommendations.csv
 ```
 
-## Current CICIDS2017 Findings
+## Other Dataset Paths
 
-The current raw dataset is:
+### Zenodo 13754300
 
-```text
-data/raw/cicids/MachineLearningCVE/
-```
+The Zenodo 5G testbed dataset provides direct throughput, jitter, packet-loss, and one-way-delay measurements. It remains the main public-measurement baseline.
 
-The dataset understanding script found:
-
-```text
-Rows: 2,830,743
-Files: 8
-Features: 79
-Label column: Label
-Label classes: 15
-```
-
-Top labels:
-
-```text
-BENIGN                 2,273,097
-DoS Hulk                 231,073
-PortScan                 158,930
-DDoS                     128,027
-DoS GoldenEye             10,293
-FTP-Patator                7,938
-SSH-Patator                5,897
-DoS slowloris              5,796
-DoS Slowhttptest           5,499
-Bot                        1,966
-```
-
-Data quality observations:
-
-```text
-Flow Bytes/s: 1,358 missing values
-Flow Bytes/s: 1,509 infinite values
-Flow Packets/s: 2,867 infinite values
-```
-
-After cleaning:
-
-```text
-Raw rows: 2,830,743
-Cleaned rows: 2,827,876
-Rows dropped: 2,867
-Raw features: 79
-Cleaned features: 71
-Constant-zero features removed: 8
-Imbalanced: True
-Majority class: BENIGN, about 80.3%
-Minority class: Heartbleed, 11 rows
-```
-
-Removed constant-zero features:
-
-```text
-Bwd PSH Flags
-Bwd URG Flags
-Fwd Avg Bytes/Bulk
-Fwd Avg Packets/Bulk
-Fwd Avg Bulk Rate
-Bwd Avg Bytes/Bulk
-Bwd Avg Packets/Bulk
-Bwd Avg Bulk Rate
-```
-
-## Verified Workflow
-
-The current scripts have been verified with the CICIDS2017 `MachineLearningCVE` dataset using:
-
-```bash
-.venv/bin/python -m py_compile src/generate_dataset.py src/process_public_dataset.py src/clean_public_dataset.py src/create_cicids_project_aligned_sample.py
-.venv/bin/python src/generate_dataset.py
-.venv/bin/python src/process_public_dataset.py
-.venv/bin/python src/clean_public_dataset.py
-.venv/bin/python src/create_cicids_project_aligned_sample.py --sample-size 800 --output-path data/processed/cicids2017_project_aligned_sample_verify.csv
-```
-
-All scripts run successfully with the current project layout.
-
-## Setup Instructions
-
-1. Create a virtual environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-For Windows:
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## Modelling Plan
-
-The modelling plan is split into baseline models and thesis-grade advanced models.
-
-The first baseline stage trains supervised regression models for predicting observed QoS outcomes. For Zenodo, the first target is `actual_throughput_mbps`.
-
-Baseline models include:
-
-* Linear Regression
-* Support Vector Regression (SVR)
-* Random Forest Regressor
-* Gradient Boosting or XGBoost
-
-Advanced models now include the first neural-network baseline:
-
-* Feedforward neural networks for tabular QoS prediction (`src/train_bnnupc_mlp.py`)
-* LSTM, GRU, or Temporal Convolutional Network models if time-windowed traffic sequences are created
-* Transformer-based models for sequence-aware QoS prediction if the processed data supports temporal context
-* Graph neural network direction if BNN-UPC topology/routing samples are extended beyond tabular path features
-
-The reason for keeping the baselines is not to claim they are state of the art. They provide sanity checks, interpretability, and comparison points before moving to deep learning models.
-
-Planned evaluation metrics:
-
-* Mean Absolute Error (MAE)
-* Root Mean Squared Error (RMSE)
-* R² Score
-* Inference Time
-
-When multiple public datasets are added, they will be cleaned and evaluated separately so model performance can be compared across datasets.
-
-### Option 2 Target Direction
-
-The current thesis direction is to move beyond a simple observed-throughput target and explore Option 2: an optimisation-based target.
-
-In this direction, the model can predict or support a derived decision target such as:
-
-```text
-recommended_bandwidth_percent
-sla_violation_risk_score
-required_capacity_mbps
-```
-
-The target should be derived from a clearly documented objective, for example:
-
-```text
-minimise weighted SLA violations subject to available link capacity
-```
-
-The QoS class weights are defined in `documents/qos_classes.md`. A simple starting point is:
-
-```text
-Gold   = highest penalty for SLA violation
-Silver = medium penalty
-Bronze = lowest penalty
-```
-
-Important leakage rule: when predicting `recommended_bandwidth_percent`, the model must not use direct outcome columns that were used to derive that target, especially `actual_throughput_mbps`.
-
-Example Zenodo baseline command:
+Fast processing without the large packet-level OWD aggregation:
 
 ```bash
 .venv/bin/python src/process_zenodo_dataset.py --skip-owd
-.venv/bin/python src/train_baseline.py \
-  --input-path data/processed/zenodo_13754300_project_aligned.csv \
-  --target-column actual_throughput_mbps \
-  --drop-column recommended_bandwidth_percent \
-  --drop-column jitter_ms \
-  --drop-column packet_loss_percent \
-  --dataset-name zenodo_13754300_throughput
-```
-
-In this setup, the model predicts actual throughput from configuration and offered-load features. `recommended_bandwidth_percent`, `jitter_ms`, and `packet_loss_percent` are dropped because they are outcome fields, not pre-deployment inputs for the first throughput prediction experiment.
-
-The same Zenodo baseline can be run with the shorter wrapper:
-
-```bash
-.venv/bin/python src/train_zenodo_baseline.py
-```
-
-By default this processes the Zenodo throughput files and aggregates OWD packet files, trains DummyRegressor, Linear Regression, SVR, Random Forest, and XGBoost baselines, and writes:
-
-```text
-reports/model_results/zenodo_baseline_results.csv
-```
-
-The same run also writes feature-importance rows for models that expose them:
-
-```text
-reports/model_results/zenodo_baseline_results_feature_importance.csv
-```
-
-At present this includes Random Forest and XGBoost. These outputs support the thesis discussion about which engineered features influence QoS prediction most strongly.
-
-The results CSV includes holdout-test metrics plus k-fold cross-validation summaries:
-
-```text
-status, error_message
-mae, rmse, r2_score
-cv_folds, cv_mae_mean, cv_mae_std, cv_rmse_mean, cv_rmse_std, cv_r2_mean, cv_r2_std
-training_time_sec, inference_time_sec, inference_time_ms_per_row
-```
-
-If XGBoost cannot run because a native runtime dependency is missing, the script records the XGBoost row with `status=skipped` and keeps the other model results.
-
-Preprocessing is model-specific: Linear Regression and SVR use median imputation plus `StandardScaler` for numeric features, while Random Forest and XGBoost use median imputation without numeric scaling because tree-based models do not require scaled inputs. Each model receives a fresh cloned preprocessor before fitting, so fitted preprocessing state is not shared between models.
-
-The default is 5-fold cross-validation. It can be changed or disabled:
-
-```bash
-.venv/bin/python src/train_zenodo_baseline.py --cv-folds 3
-.venv/bin/python src/train_zenodo_baseline.py --cv-folds 0
-```
-
-For a faster throughput-only check, skip the large OWD packet aggregation:
-
-```bash
 .venv/bin/python src/train_zenodo_baseline.py --skip-owd
 ```
 
-To predict the derived bandwidth recommendation instead, choose that target explicitly:
+The default Zenodo target is `actual_throughput_mbps`. Outcome fields such as derived bandwidth recommendations, jitter, and packet loss are excluded when they would leak post-measurement information into a deployment-style prediction task.
+
+### CICIDS2017
+
+CICIDS2017 is retained for data-engineering exploration only. It is an intrusion-detection dataset rather than a QoS dataset, so SD-WAN-aligned fields derived from it are proxies and are not used as primary QoS evidence.
 
 ```bash
-.venv/bin/python src/train_zenodo_baseline.py --target recommended_bandwidth_percent
+.venv/bin/python src/process_public_dataset.py
+.venv/bin/python src/clean_public_dataset.py
+.venv/bin/python src/create_cicids_project_aligned_sample.py
 ```
 
-For this target, the wrapper automatically drops `actual_throughput_mbps` from the model inputs to avoid leakage, because `recommended_bandwidth_percent` is derived from actual/offered throughput. The default output for this run is:
-
-```text
-reports/model_results/zenodo_baseline_recommended_bandwidth_results.csv
-```
-
-### Current BNN-UPC Log-Delay Results
-
-The current BNN-UPC target is `log_avg_delay`. The log transform is used because raw `avg_delay` is heavy-tailed, especially for Bronze traffic under congestion.
-
-| Model | MAE | RMSE | R² | CV R² mean |
-| --- | ---: | ---: | ---: | ---: |
-| Linear Regression | 0.2267 | 0.4152 | 0.6849 | 0.6895 |
-| SVR (RBF) | 0.1740 | 0.3909 | 0.7206 | 0.7212 |
-| Random Forest | 0.1810 | 0.3640 | 0.7579 | 0.7638 |
-| XGBoost | 0.1846 | 0.3588 | 0.7646 | 0.7659 |
-| PyTorch MLP | 0.1854 | 0.3574 | 0.7665 | 0.7695 |
-
-The MLP is a simple feedforward network with three hidden layers (`128,64,32`), ReLU activations, dropout, AdamW, and early stopping. It is currently competitive with XGBoost on this tabular log-delay task.
-
-### Current BNN-UPC QoS-Aware Evaluation
-
-Using out-of-fold XGBoost predictions, global delay MAE is `12.63 ms`, but the class-level view is very different:
-
-| QoS class | Rows | MAE delay | RMSLE delay | R² on log delay |
-| --- | ---: | ---: | ---: | ---: |
-| Gold | 4,592 | 3.05 ms | 0.160 | 0.914 |
-| Silver | 8,991 | 3.48 ms | 0.168 | 0.908 |
-| Bronze | 15,697 | 20.68 ms | 0.451 | 0.704 |
-
-This confirms that Bronze is much harder to predict and should not be hidden inside a single pooled metric.
-
-Policy/scenario slicing also shows different difficulty levels:
-
-| Slice | MAE delay | R² on log delay |
-| --- | ---: | ---: |
-| A_wfq_fixed | 6.16 ms | 0.796 |
-| B_wfq_profiles | 12.01 ms | 0.758 |
-| C_mixed_policy | 21.32 ms | 0.743 |
-| D_mixed_equal | 9.95 ms | 0.779 |
-
-For SLA violation triggers, precision is strongest for Gold:
-
-| QoS class | SLA threshold | Precision | Recall | F1 |
-| --- | ---: | ---: | ---: | ---: |
-| Gold | 30 ms | 0.994 | 0.899 | 0.944 |
-| Silver | 50 ms | 0.823 | 0.639 | 0.720 |
-| Bronze | 60 ms | 0.619 | 0.568 | 0.592 |
-
-This means that when the model predicts a Gold SLA violation, it is almost always correct, which is useful for SD-WAN policy triggers.
-
-### Evaluate Bronze Packet-Loss Classification
-
-Gold and Silver packet-loss events are near-zero in the v1 BNN-UPC dataset, so packet-loss modelling is restricted to Bronze flows:
+### Synthetic data
 
 ```bash
-.venv/bin/python src/evaluate_bnnupc_bronze_loss_classifier.py
+.venv/bin/python src/generate_dataset.py
 ```
 
-Output:
+This creates `data/synthetic/sdwan_qos_synthetic.csv` with rule-based SD-WAN-style features and a derived bandwidth-recommendation target. It is intended for pipeline development, not empirical performance claims.
 
-```text
-reports/model_results/bnnupc_bronze_loss_classifier.csv
-```
+## Leakage Prevention
 
-The classifier predicts whether a Bronze flow experiences any packet loss (`packet_loss_rate > 0`). The class-weighted XGBoost model gives high recall for loss-risk alerting:
+The project applies the following rules:
 
-| Model | Precision | Recall | F1 | AUC-ROC |
-| --- | ---: | ---: | ---: | ---: |
-| XGBoost default threshold | 0.777 | 0.328 | 0.461 | 0.914 |
-| XGBoost class-weighted | 0.342 | 0.865 | 0.490 | 0.916 |
-| Random Forest balanced | 0.663 | 0.389 | 0.490 | 0.895 |
+- `simulation_id` and `scenario` are excluded from BNN-UPC model inputs.
+- Raw delay, jitter, packet loss, percentiles, and achieved bandwidth are excluded when predicting `log_avg_delay`.
+- Preprocessing is fitted independently inside each training fold.
+- The primary BNN-UPC evaluation groups all flows from the same simulation run into the same fold.
+- When predicting a derived recommendation target, any observed outcome used to construct that target is excluded from the feature matrix.
 
-### Current Layer 3 Allocation Result
+## Results and Documentation
 
-Using the default SLA thresholds (`20/50/100 ms`) and default candidate profiles, the current recommender ranks `60/30/10` highest. No tested profile fully satisfies the Gold SLA threshold because predicted Gold mean delay remains around 24-25 ms. This is still useful: it shows the recommender can identify when a traffic pattern cannot meet the SLA with the available candidate profiles, then select the least-violating allocation.
+- `reports/model_results/README.md` maps each curated result CSV to its experiment.
+- `data/raw/BNN_UPC/README.md` documents local BNNetSimulator generation.
+- `data/raw/Zenodo_13754300/README.md` documents the Zenodo source files.
+- `documents/qos_classes.md` defines the Gold, Silver, and Bronze policy.
+- `documents/model_explanation.md` explains the main modelling pipeline.
 
-## Notes on Data
+## Limitations
 
-This project currently uses synthetic SD-WAN-style QoS data, the Zenodo 5G campus network QoS dataset, and exploratory public network-flow datasets.
-
-Zenodo is preferred for the main public-data experiments because it contains direct QoS measurements. Public intrusion-detection datasets such as CICIDS2017 are not real SD-WAN QoS datasets, so QoS-related fields derived from them are proxy features only.
-
-This limitation will be discussed clearly in the thesis.
+- The primary dataset is simulator-generated; grouped validation tests unseen runs from the same generator, not transfer to a real enterprise network.
+- The current feature set is mostly static and does not include recent queue occupancy, arrival-rate windows, or controller telemetry.
+- Tail delay is substantially harder to predict than average delay, and jitter does not generalise reliably from the current features.
+- Neural comparisons have not yet been repeated under the same simulation-grouped outer-fold protocol.
+- SLA thresholds and WFQ allocation profiles are experimental operating points.
 
 ## Author
 
 Rishiv Shitlani
 
-MSc Computer Science Artificial Intelligence
+MSc Computer Science (Artificial Intelligence)
 
 University of Galway
