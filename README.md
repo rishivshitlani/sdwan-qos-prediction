@@ -1,22 +1,53 @@
 # AI-Driven QoS Prediction in SD-WAN Networks
 
-This repository contains the code, processed experiment data, results, thesis material, and conference paper for an MSc Artificial Intelligence project on quality-of-service (QoS) prediction in software-defined wide area networks (SD-WANs).
+This repository contains the data pipelines, experiments, results, thesis material, and conference paper for an MSc Artificial Intelligence project on quality-of-service (QoS) prediction in software-defined wide area networks (SD-WANs).
 
-The current primary experiment uses packet-level simulations from **BNNetSimulator** to predict per-flow delay for Gold, Silver, and Bronze traffic. The evaluation is grouped by simulation run so that related flows from the same run cannot appear in both training and validation data.
+The completed main study uses packet-level data generated with **BNNetSimulator**. It predicts per-flow delay for Gold, Silver, and Bronze traffic and evaluates whether those predictions can support SLA-risk detection and candidate weighted-fair-queuing (WFQ) allocation decisions.
 
-## Research Focus
+## Project Status
 
-The project investigates three connected questions:
+The repository currently includes:
 
-1. How accurately can machine-learning models predict continuous QoS outcomes for different traffic classes?
-2. How does evaluation design, particularly row-wise versus simulation-grouped validation, affect the reported performance?
-3. Can predicted QoS support SD-WAN decisions such as SLA-risk detection and candidate WFQ bandwidth allocation?
+- generation and processing of a local BNN-UPC-style simulation dataset;
+- leakage-safe classical regression baselines;
+- row-wise XGBoost, multilayer perceptron (MLP), and FT-Transformer comparisons;
+- QoS-class, scenario, scheduling-policy, tail-delay, jitter, and SLA analyses;
+- model-significance and feature-importance utilities;
+- an exploratory XGBoost evaluation grouped by simulation run (see [Grouped Evaluation](#grouped-evaluation-not-used-in-the-thesis-or-conference-paper); not used in the thesis or conference paper);
+- an experimental WFQ allocation recommender;
+- earlier Zenodo, CICIDS2017, and synthetic-data pipelines; and
+- the MSc thesis and an IEEE-style conference paper.
 
-The main supervised-learning target is `log_avg_delay`, the natural logarithm of average per-flow delay. Secondary targets include 90th-percentile delay (`delay_p90`) and jitter.
+The primary prediction target is `log_avg_delay`, the natural logarithm of average flow delay in seconds. Average delay in milliseconds is recovered with `exp(log_avg_delay) * 1000`. The reported QoS-aware model comparisons use shuffled row-wise five-fold cross-validation with a fixed random seed.
 
-## Current Headline Results
+## Main Dataset and Results
 
-The primary dataset contains **29,280 flows from 400 simulation runs**:
+The processed BNN-UPC dataset contains **29,280 flows from 400 simulation runs**. Each row represents a source-destination flow.
+
+| QoS class | Flows | Row-wise log-delay R² | Delay MAE | SLA F1 |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 4,592 | 0.914 | 3.05 ms | 0.944 |
+| Silver | 8,991 | 0.908 | 3.48 ms | 0.720 |
+| Bronze | 15,697 | 0.704 | 20.68 ms | 0.592 |
+| Overall | 29,280 | 0.766 | 12.63 ms | — |
+
+These values are the checked-in row-wise XGBoost results in [`bnnupc_qos_slice_evaluation.csv`](reports/model_results/bnnupc_qos_slice_evaluation.csv) and [`bnnupc_sla_violation_precision.csv`](reports/model_results/bnnupc_sla_violation_precision.csv). `simulation_id` and `scenario` are excluded from the model features.
+
+Additional row-wise findings are:
+
+- 90th-percentile delay: overall R² = 0.287 and MAE = 23.77 ms;
+- jitter: overall R² = 0.020 and MAE = 1.74 ms; and
+- Gold SLA alerts: precision = 0.994, recall = 0.899, and F1 = 0.944.
+
+The MLP reaches overall R² = 0.766 and the FT-Transformer reaches 0.762 under their corresponding row-wise outer-fold evaluations. These protocols evaluate held-out flow rows; they do not hold out complete simulation runs.
+
+The complete interpretation and limitations are discussed in the [conference paper](IEEE-paper/IEEE_paper_main.pdf).
+
+## Grouped Evaluation (Not Used in the Thesis or Conference Paper)
+
+The row-wise cross-validation above splits individual flow rows, so rows from the same simulation run can land in different folds even though `simulation_id` is not used as a feature. To check whether that affects the reported scores, a separate XGBoost evaluation was run using `sklearn.model_selection.GroupKFold` with `simulation_id` as the grouping key, so every flow from a given simulation run stays entirely on one side of each fold.
+
+This evaluation was completed and is fully reproducible: running [`src/evaluate_bnnupc_grouped_cv.py`](src/evaluate_bnnupc_grouped_cv.py) regenerates [`bnnupc_grouped_cv_xgb.csv`](reports/model_results/bnnupc_grouped_cv_xgb.csv), and [`src/evaluate_bnnupc_grouped_metrics.py`](src/evaluate_bnnupc_grouped_metrics.py) regenerates [`bnnupc_grouped_cv_metrics.csv`](reports/model_results/bnnupc_grouped_cv_metrics.csv).
 
 | QoS class | Flows | Grouped log-delay R² | Delay MAE | SLA F1 |
 | --- | ---: | ---: | ---: | ---: |
@@ -25,42 +56,34 @@ The primary dataset contains **29,280 flows from 400 simulation runs**:
 | Bronze | 15,697 | 0.680 | 21.57 ms | 0.554 |
 | Overall | 29,280 | 0.747 | 13.19 ms | — |
 
-These values come from five-fold `sklearn.model_selection.GroupKFold` evaluation using `simulation_id` as the grouping key. The identifier is used only to define folds and is excluded from model inputs.
+Additional grouped findings: 90th-percentile delay overall R² = 0.293 (MAE = 32.51 ms); jitter overall R² = -0.040 (MAE = 3.22 ms); Gold SLA precision = 0.986, recall = 0.898, F1 = 0.940.
 
-A shuffled row-wise comparison produces a modestly higher overall R² of 0.766. The difference supports treating the simulation run, rather than an individual flow row, as the evaluation unit when flows from a run share topology, load, and scheduler context.
+**This evaluation is not discussed in the MSc thesis and is not used in the conference paper.** Both of those documents report only the row-wise results in the section above. The grouped result is retained here as a supporting sensitivity check on the evaluation protocol, not as a competing headline claim.
 
-Under the same grouped protocol:
-
-- 90th-percentile delay is moderately predictable overall (R² = 0.293).
-- Jitter is not predicted reliably by the static feature set (R² = -0.040).
-- Gold SLA alerts have 0.986 precision: 1,184 of 1,201 predicted violations are true violations.
-
-The complete discussion and limitations are available in the [conference paper](output/pdf/SSGP26_SD-WAN_QoS_Paper_Draft.pdf). A [single-column reading version](output/pdf/SSGP26_SD-WAN_QoS_Paper_iPad_Reading.pdf) is also provided.
-
-## Repository Structure
+## Repository Layout
 
 ```text
 sdwan-qos-prediction/
-├── conference-paper/        IEEE-style paper source, figures, and build output
+├── IEEE-paper/             IEEE-style paper source and figures
 ├── data/
-│   ├── raw/                 source datasets and BNNetSimulator inputs/results
-│   ├── processed/           project-aligned datasets
-│   └── synthetic/           generated SD-WAN-style data
-├── documents/               QoS-class and model documentation
+│   ├── raw/                 source datasets and simulator files
+│   ├── processed/           processed modelling datasets and audit reports
+│   └── synthetic/           generated development dataset
+├── documents/               project notes and supporting documentation
 ├── MSc AI-DA-AI Online Thesis Document/
-│                            thesis source, figures, bibliography, and PDF
-├── output/pdf/              stable paper PDFs for reading and distribution
-├── reports/model_results/   curated experiment metrics and recommendations
-├── src/                     generation, processing, modelling, and evaluation
+│                            thesis source, bibliography, figures, and PDF
+├── output/pdf/              stable paper output
+├── reports/model_results/   curated experiment results
+├── src/                     data, modelling, evaluation, and plotting scripts
 ├── requirements.txt
 └── README.md
 ```
 
-Large raw datasets, the virtual environment, and most generated model artifacts are intentionally excluded from Git. Curated experiment CSVs under `reports/model_results/` are retained when they support the reported analysis.
+Large raw datasets, the virtual environment, simulator output, and most generated model artifacts are excluded from Git. Curated CSV results needed to support the written analysis are retained in `reports/model_results/`.
 
 ## Setup
 
-Python 3.10 or newer is recommended. Always run the project through its virtual environment.
+Python 3.10 or newer is recommended. Use the project virtual environment for all commands.
 
 ```bash
 python3 -m venv .venv
@@ -68,17 +91,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Docker Desktop is additionally required to generate packet-level results with BNNetSimulator.
-
-To check the Python sources:
+Check that every Python script parses correctly:
 
 ```bash
 .venv/bin/python -m py_compile src/*.py
 ```
 
-## Primary BNN-UPC Workflow
+Docker Desktop is also required to generate new BNNetSimulator results.
 
-### 1. Generate BNNetSimulator inputs
+## Reproduce the Main BNN-UPC Workflow
+
+### 1. Generate simulator inputs
 
 ```bash
 .venv/bin/python src/generate_bnnupc_dataset.py \
@@ -88,15 +111,28 @@ To check the Python sources:
   --net-size-max 12
 ```
 
-This produces topology, routing, traffic-matrix, configuration, and manifest files under:
+This creates graphs, routing matrices, traffic matrices, `simulation.txt`, and `conf.yml` under `data/raw/BNN_UPC/sim_input/`. With these arguments it creates 400 runs. Generation is deterministic for a fixed random seed.
 
-```text
-data/raw/BNN_UPC/sim_input/
-```
+Four experiment scenarios are represented:
 
-The default experiment creates 20 topologies and 20 traffic matrices per topology, giving 400 simulation runs. Generation is deterministic for a fixed random seed.
+| Scenario | Scheduling setup |
+| --- | --- |
+| A | WFQ with fixed Gold/Silver/Bronze weights of 60/30/10 |
+| B | WFQ with varied queue-weight profiles |
+| C | Mixed SP, WFQ, and DRR policies with varied profiles |
+| D | Mixed policies with equally probable traffic-class assignment |
+
+The project maps simulator ToS values to classes as follows:
+
+| ToS | QoS class | Intended priority |
+| ---: | --- | --- |
+| 0 | Gold | Highest |
+| 1 | Silver | Medium |
+| 2 | Bronze | Lowest |
 
 ### 2. Run BNNetSimulator
+
+From the repository root:
 
 ```bash
 docker run --rm \
@@ -104,70 +140,55 @@ docker run --rm \
   bnnupc/bnnetsimulator
 ```
 
-The official container writes compressed per-flow simulation results beneath `data/raw/BNN_UPC/sim_input/results/`.
+The container writes compressed per-flow results beneath `data/raw/BNN_UPC/sim_input/results/qos_sdwan/`.
 
-### 3. Process the simulation results
+### 3. Build the modelling table
 
 ```bash
 .venv/bin/python src/process_bnnupc_dataset.py
 ```
 
-Output:
+Output: `data/processed/bnnupc_qos_dataset.csv`
 
-```text
-data/processed/bnnupc_qos_dataset.csv
-```
+The table contains simulation context, traffic class, offered bandwidth, traffic distribution, route length, topology size, link properties, scheduler information, queue weights, delay percentiles, jitter, packet loss, achieved bandwidth, and the log-delay target.
 
-Each row represents one source-destination flow. The processed features include traffic class, offered bandwidth, traffic distribution, route length, topology size, link properties, scheduling policy, and queue weights. Outcome columns include average delay, delay percentiles, jitter, packet loss, and achieved bandwidth.
-
-BNNetSimulator ToS values are mapped as follows:
-
-| ToS | QoS class | Priority |
-| ---: | --- | --- |
-| 0 | Gold | Highest |
-| 1 | Silver | Medium |
-| 2 | Bronze | Lowest |
-
-### 4. Run the primary grouped evaluation
+### 4. Run the QoS-aware row-wise evaluation
 
 ```bash
-.venv/bin/python src/evaluate_bnnupc_grouped_cv.py
+.venv/bin/python src/evaluate_bnnupc_qos_slices.py
 ```
 
-Output:
+Outputs:
 
 ```text
-reports/model_results/bnnupc_grouped_cv_xgb.csv
+reports/model_results/bnnupc_qos_slice_evaluation.csv
+reports/model_results/bnnupc_sla_violation_precision.csv
 ```
 
-The evaluator trains XGBoost on `log_avg_delay`, creates out-of-fold predictions with `GroupKFold`, and reports overall and per-class regression and SLA-trigger metrics. The row-wise sensitivity results are produced separately by `evaluate_bnnupc_qos_slices.py`.
+This script creates out-of-fold XGBoost predictions using shuffled five-fold row-wise cross-validation, then reports overall, per-class, scenario, and scheduling-policy regression metrics plus SLA classification metrics.
 
-### 5. Evaluate tail delay and jitter with the same folds
+### 5. Evaluate tail delay and jitter
 
 ```bash
-.venv/bin/python src/evaluate_bnnupc_grouped_metrics.py
+.venv/bin/python src/evaluate_bnnupc_metric_slices.py
 ```
 
-Output:
+Output: `reports/model_results/bnnupc_metric_slice_evaluation.csv`
 
-```text
-reports/model_results/bnnupc_grouped_cv_metrics.csv
-```
-
-### 6. Generate SHAP and thesis figures
+### 6. Generate analysis figures
 
 ```bash
 .venv/bin/python src/plot_shap_importance.py
 .venv/bin/python src/plot_thesis_figures.py
 ```
 
-These scripts write publication figures to the thesis figure directory. The SHAP plots describe model associations, not causal effects.
+The figure scripts write into the thesis figure directory. SHAP values describe model associations and must not be interpreted as causal effects.
 
-## Additional Model Comparisons
+## Supporting Experiments
 
-### Classical models
+### Classical regression models
 
-The generic trainer supports leakage-safe preprocessing for linear regression, SVR, random forest, and XGBoost:
+`train_baseline.py` supports a mean dummy regressor, linear regression, RBF SVR, random forest, and XGBoost. For the BNN-UPC log-delay task, use:
 
 ```bash
 .venv/bin/python src/train_baseline.py \
@@ -186,6 +207,8 @@ The generic trainer supports leakage-safe preprocessing for linear regression, S
   --drop-column actual_bandwidth
 ```
 
+The generic trainer records holdout and shuffled K-fold metrics and writes feature importance for compatible models. It does not group folds by simulation.
+
 ### Neural tabular models
 
 ```bash
@@ -193,79 +216,70 @@ The generic trainer supports leakage-safe preprocessing for linear regression, S
 .venv/bin/python src/train_bnnupc_ft_transformer.py
 ```
 
-Class- and policy-aware comparisons can be produced with:
+QoS-aware out-of-fold comparisons are produced with:
 
 ```bash
 .venv/bin/python src/evaluate_bnnupc_mlp_slices.py
 .venv/bin/python src/evaluate_bnnupc_ft_transformer_slices.py
 ```
 
-The existing neural comparisons use row-wise outer folds and are therefore supporting sensitivity results, not substitutes for the primary simulation-grouped estimate.
+### SLA threshold and packet-loss analysis
 
-## SLA and QoS-Slice Evaluation
+The QoS-aware evaluator reports row-wise out-of-fold results by QoS class, scenario, and scheduling policy. Default experimental SLA thresholds are 30 ms for Gold, 50 ms for Silver, and 60 ms for Bronze. They are research operating points, not contractual SLA values.
 
-The general slice evaluator reports metrics by class, scenario, and scheduling policy:
-
-```bash
-.venv/bin/python src/evaluate_bnnupc_qos_slices.py
-```
-
-Default experimental SLA thresholds are:
-
-```text
-Gold:   30 ms
-Silver: 50 ms
-Bronze: 60 ms
-```
-
-These thresholds are research operating points, not contractual SLA values. The Bronze threshold can be examined with a sensitivity sweep:
+Reproduce the Bronze delay-threshold sensitivity analysis with:
 
 ```bash
 .venv/bin/python src/evaluate_bnnupc_qos_slices.py --bronze-sweep
 ```
 
-Bronze packet-loss risk can be evaluated separately:
+The Bronze threshold started at 100 ms. The sweep above was used to test lower values, and 60 ms was kept as the final threshold because it stays strictly above Silver's 50 ms threshold while increasing recall by about 54% relative to 100 ms (0.368 to 0.568), at a modest precision cost (0.726 to 0.619).
+
+Evaluate Bronze packet-loss occurrence separately with:
 
 ```bash
 .venv/bin/python src/evaluate_bnnupc_bronze_loss_classifier.py
 ```
 
-Gold and Silver loss events are too rare in the current dataset for a meaningful equivalent classifier.
+Gold and Silver packet-loss events are too rare in the current simulations for equivalent class-specific classifiers.
 
-## Experimental Layer 3 Allocation Recommender
+### Model comparison utilities
 
-The project also contains a what-if recommender for candidate WFQ class weights:
+```bash
+.venv/bin/python src/compute_bnnupc_global_mae_ms.py
+.venv/bin/python src/compute_model_significance.py
+```
+
+These create global millisecond comparisons and a paired XGBoost-versus-MLP significance report using the project's row-wise or row-split evaluation protocols.
+
+## Experimental WFQ Allocation Recommender
 
 ```bash
 .venv/bin/python src/recommend_qos_allocation.py
 ```
 
-It scores candidate Gold/Silver/Bronze profiles by predicted class delay, SLA feasibility, and weighted violation cost. This is an experimental extension built on model predictions; it is not part of the conference paper's reported contributions and is not a production SD-WAN controller.
+The recommender fits a delay model and scores candidate Gold/Silver/Bronze WFQ weight profiles using predicted delay, SLA feasibility, and weighted violation cost.
 
-Output:
+Output: `reports/model_results/bnnupc_qos_allocation_recommendations.csv`
 
-```text
-reports/model_results/bnnupc_qos_allocation_recommendations.csv
-```
+This is a model-based what-if experiment. It is not a production SD-WAN controller, does not directly configure a network, and is not part of the conference paper's reported contributions.
 
-## Other Dataset Paths
+## Earlier Dataset Pipelines
 
 ### Zenodo 13754300
 
-The Zenodo 5G testbed dataset provides direct throughput, jitter, packet-loss, and one-way-delay measurements. It remains the main public-measurement baseline.
-
-Fast processing without the large packet-level OWD aggregation:
+The Zenodo 5G testbed dataset provides measured throughput, jitter, packet loss, and one-way delay. It is retained as the public-measurement baseline.
 
 ```bash
 .venv/bin/python src/process_zenodo_dataset.py --skip-owd
 .venv/bin/python src/train_zenodo_baseline.py --skip-owd
 ```
 
-The default Zenodo target is `actual_throughput_mbps`. Outcome fields such as derived bandwidth recommendations, jitter, and packet loss are excluded when they would leak post-measurement information into a deployment-style prediction task.
+`--skip-owd` avoids aggregating the large packet-level one-way-delay files. The default modelling target is `actual_throughput_mbps`; the wrapper removes post-measurement fields that would leak the outcome. A derived `recommended_bandwidth_percent` target is also supported as a secondary compatibility experiment.
 
 ### CICIDS2017
 
-CICIDS2017 is retained for data-engineering exploration only. It is an intrusion-detection dataset rather than a QoS dataset, so SD-WAN-aligned fields derived from it are proxies and are not used as primary QoS evidence.
+CICIDS2017 is an intrusion-detection dataset, not a direct QoS dataset. It is used only for data-engineering exploration; any SD-WAN-aligned fields derived from it are proxies.
 
 ```bash
 .venv/bin/python src/process_public_dataset.py
@@ -273,44 +287,44 @@ CICIDS2017 is retained for data-engineering exploration only. It is an intrusion
 .venv/bin/python src/create_cicids_project_aligned_sample.py
 ```
 
-### Synthetic data
+### Synthetic development data
 
 ```bash
 .venv/bin/python src/generate_dataset.py
 ```
 
-This creates `data/synthetic/sdwan_qos_synthetic.csv` with rule-based SD-WAN-style features and a derived bandwidth-recommendation target. It is intended for pipeline development, not empirical performance claims.
+This creates `data/synthetic/sdwan_qos_synthetic.csv` with rule-based features and a derived bandwidth-recommendation target. It supports pipeline development and is not used for empirical performance claims.
 
-## Leakage Prevention
+## Leakage Controls
 
-The project applies the following rules:
+For the main BNN-UPC log-delay task:
 
-- `simulation_id` and `scenario` are excluded from BNN-UPC model inputs.
-- Raw delay, jitter, packet loss, percentiles, and achieved bandwidth are excluded when predicting `log_avg_delay`.
-- Preprocessing is fitted independently inside each training fold.
-- The primary BNN-UPC evaluation groups all flows from the same simulation run into the same fold.
-- When predicting a derived recommendation target, any observed outcome used to construct that target is excluded from the feature matrix.
+- `simulation_id` and `scenario` are excluded from model inputs;
+- average delay, delay percentiles, jitter, packet loss, and achieved bandwidth are excluded because they are outcomes of the same simulation;
+- preprocessing is fitted independently within each fold; and
+- evaluation rows are scored only from out-of-fold predictions.
+
+The reported cross-validation splits individual flow rows. Consequently, flows from the same simulation run can appear in different folds even though `simulation_id` is not used as a feature.
+
+For derived recommendation targets, observed outcomes used to calculate the target are removed from the feature matrix.
 
 ## Results and Documentation
 
-- `reports/model_results/README.md` maps each curated result CSV to its experiment.
-- `data/raw/BNN_UPC/README.md` documents local BNNetSimulator generation.
-- `data/raw/Zenodo_13754300/README.md` documents the Zenodo source files.
-- `documents/qos_classes.md` defines the Gold, Silver, and Bronze policy.
-- `documents/model_explanation.md` explains the main modelling pipeline.
+- [`reports/model_results/README.md`](reports/model_results/README.md) maps curated CSV files to experiments.
+- [`data/raw/BNN_UPC/README.md`](data/raw/BNN_UPC/README.md) documents local simulator-data generation.
+- [`data/raw/Zenodo_13754300/README.md`](data/raw/Zenodo_13754300/README.md) describes the Zenodo source files.
+- [`documents/qos_classes.md`](documents/qos_classes.md) defines the Gold, Silver, and Bronze policy.
+- [`documents/model_explanation.md`](documents/model_explanation.md) explains the modelling pipeline.
+
+Most result-producing scripts append timestamped rows when an output already exists, while some dedicated evaluators overwrite their CSVs. Check timestamps and evaluation labels before comparing runs.
 
 ## Limitations
 
-- The primary dataset is simulator-generated; grouped validation tests unseen runs from the same generator, not transfer to a real enterprise network.
-- The current feature set is mostly static and does not include recent queue occupancy, arrival-rate windows, or controller telemetry.
-- Tail delay is substantially harder to predict than average delay, and jitter does not generalise reliably from the current features.
-- Neural comparisons have not yet been repeated under the same simulation-grouped outer-fold protocol.
-- SLA thresholds and WFQ allocation profiles are experimental operating points.
+- The main dataset is simulator-generated. The row-wise evaluation measures performance on held-out flow records from the same generator, not transfer to unseen simulation runs or a real enterprise network.
+- The features are mainly static and do not include recent queue occupancy, rolling arrival rates, or live controller telemetry.
+- Bronze delay is harder to predict than Gold or Silver delay; tail delay is only moderately predictable, and jitter is predicted weakly with the current features.
+- SLA thresholds and candidate WFQ profiles are experimental choices.
 
 ## Author
 
-Rishiv Shitlani
-
-MSc Computer Science (Artificial Intelligence)
-
-University of Galway
+Rishiv Shitlani — MSc Computer Science (Artificial Intelligence), University of Galway
